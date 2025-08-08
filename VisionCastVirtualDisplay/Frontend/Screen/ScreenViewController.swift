@@ -23,7 +23,7 @@ class ScreenViewController: SubscriberViewController<ScreenViewData>, NSWindowDe
 
         let descriptor = CGVirtualDisplayDescriptor()
         descriptor.setDispatchQueue(DispatchQueue.main)
-        descriptor.name = "DeskPad Display"
+        descriptor.name = "Vision Cast Virtual Display"
         descriptor.maxPixelsWide = 3840
         descriptor.maxPixelsHigh = 2160
         descriptor.sizeInMillimeters = CGSize(width: 1600, height: 1000)
