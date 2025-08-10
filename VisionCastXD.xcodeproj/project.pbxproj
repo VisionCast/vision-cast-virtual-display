@@ -1,0 +1,601 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 73;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		6D2F1486280C20C800A3A2E5 /* SubscriberViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D2F1485280C20C800A3A2E5 /* SubscriberViewController.swift */; };
+		6D2F148A280C20D000A3A2E5 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D2F1487280C20D000A3A2E5 /* AppState.swift */; };
+		6D2F148B280C20D000A3A2E5 /* SideEffectsMiddleware.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D2F1488280C20D000A3A2E5 /* SideEffectsMiddleware.swift */; };
+		6D2F148C280C20D000A3A2E5 /* Store.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D2F1489280C20D000A3A2E5 /* Store.swift */; };
+		6D2F148E280C211E00A3A2E5 /* ScreenViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D2F148D280C211E00A3A2E5 /* ScreenViewController.swift */; };
+		6D41B09F2879FAB6007CEB2F /* MouseLocationSideEffect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D41B09E2879FAB6007CEB2F /* MouseLocationSideEffect.swift */; };
+		6D41B0A12879FABE007CEB2F /* MouseLocationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D41B0A02879FABE007CEB2F /* MouseLocationState.swift */; };
+		6D41B0A42879FBA8007CEB2F /* ScreenViewData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D41B0A32879FBA8007CEB2F /* ScreenViewData.swift */; };
+		6D68E1AF287ABB9900CD574A /* ScreenConfigurationSideEffect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D68E1AE287ABB9900CD574A /* ScreenConfigurationSideEffect.swift */; };
+		6D68E1B2287ABDB900CD574A /* NSScreen+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D68E1B1287ABDB900CD574A /* NSScreen+Extensions.swift */; };
+		6D68E1B4287ABFC800CD574A /* ScreenConfigurationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D68E1B3287ABFC800CD574A /* ScreenConfigurationState.swift */; };
+		6DC044522801877F00281728 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DC044512801877F00281728 /* AppDelegate.swift */; };
+		6DC044562801878100281728 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6DC044552801878100281728 /* Assets.xcassets */; };
+		6DC04461280191EB00281728 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DC04460280191EB00281728 /* main.swift */; };
+		AF6BD8C22E45B793005B3991 /* CustomResolutionWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF6BD8C12E45B793005B3991 /* CustomResolutionWindowController.swift */; };
+		AF6BD8C42E45B7A4005B3991 /* CustomResolutionViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF6BD8C32E45B7A3005B3991 /* CustomResolutionViewController.swift */; };
+		AF6BD8CA2E45C488005B3991 /* NDISender.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF6BD8C92E45C487005B3991 /* NDISender.swift */; };
+		AF6BD8DA2E45CC27005B3991 /* ReSwift in Frameworks */ = {isa = PBXBuildFile; productRef = AF6BD8D92E45CC27005B3991 /* ReSwift */; settings = {ATTRIBUTES = (Required, ); }; };
+		AF6BD8ED2E45D355005B3991 /* ForceLinkNDI.m in Sources */ = {isa = PBXBuildFile; fileRef = AF6BD8EC2E45D354005B3991 /* ForceLinkNDI.m */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		AF6BD8FE2E45D582005B3991 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		6D2F1485280C20C800A3A2E5 /* SubscriberViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SubscriberViewController.swift; sourceTree = "<group>"; };
+		6D2F1487280C20D000A3A2E5 /* AppState.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		6D2F1488280C20D000A3A2E5 /* SideEffectsMiddleware.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SideEffectsMiddleware.swift; sourceTree = "<group>"; };
+		6D2F1489280C20D000A3A2E5 /* Store.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Store.swift; sourceTree = "<group>"; };
+		6D2F148D280C211E00A3A2E5 /* ScreenViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ScreenViewController.swift; sourceTree = "<group>"; };
+		6D36BEB92801A39200EAB869 /* CGVirtualDisplayPrivate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CGVirtualDisplayPrivate.h; sourceTree = "<group>"; };
+		6D36BEBA2801A40600EAB869 /* VisionCastXD-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "VisionCastXD-Bridging-Header.h"; sourceTree = "<group>"; };
+		6D41B09E2879FAB6007CEB2F /* MouseLocationSideEffect.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MouseLocationSideEffect.swift; sourceTree = "<group>"; };
+		6D41B0A02879FABE007CEB2F /* MouseLocationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseLocationState.swift; sourceTree = "<group>"; };
+		6D41B0A32879FBA8007CEB2F /* ScreenViewData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenViewData.swift; sourceTree = "<group>"; };
+		6D68E1AE287ABB9900CD574A /* ScreenConfigurationSideEffect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenConfigurationSideEffect.swift; sourceTree = "<group>"; };
+		6D68E1B1287ABDB900CD574A /* NSScreen+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSScreen+Extensions.swift"; sourceTree = "<group>"; };
+		6D68E1B3287ABFC800CD574A /* ScreenConfigurationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenConfigurationState.swift; sourceTree = "<group>"; };
+		6DC0444E2801877F00281728 /* VisionCastXD.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VisionCastXD.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6DC044512801877F00281728 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		6DC044552801878100281728 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		6DC0445A2801878100281728 /* VisionCastXD.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VisionCastXD.entitlements; sourceTree = "<group>"; };
+		6DC04460280191EB00281728 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		AF6BD8C12E45B793005B3991 /* CustomResolutionWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomResolutionWindowController.swift; sourceTree = "<group>"; };
+		AF6BD8C32E45B7A3005B3991 /* CustomResolutionViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomResolutionViewController.swift; sourceTree = "<group>"; };
+		AF6BD8C52E45BDCD005B3991 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		AF6BD8C72E45C422005B3991 /* libndi.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libndi.dylib; path = "../../../../../Library/NDI SDK for Apple/lib/macOS/libndi.dylib"; sourceTree = "<group>"; };
+		AF6BD8C92E45C487005B3991 /* NDISender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NDISender.swift; sourceTree = "<group>"; };
+		AF6BD8EC2E45D354005B3991 /* ForceLinkNDI.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ForceLinkNDI.m; sourceTree = "<group>"; };
+		AF6BD8EE2E45D47C005B3991 /* Processing.NDI.compat.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Processing.NDI.compat.h; sourceTree = "<group>"; };
+		AF6BD8EF2E45D47C005B3991 /* Processing.NDI.deprecated.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Processing.NDI.deprecated.h; sourceTree = "<group>"; };
+		AF6BD8F02E45D47C005B3991 /* Processing.NDI.DynamicLoad.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Processing.NDI.DynamicLoad.h; sourceTree = "<group>"; };
+		AF6BD8F12E45D47C005B3991 /* Processing.NDI.Find.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Processing.NDI.Find.h; sourceTree = "<group>"; };
+		AF6BD8F22E45D47C005B3991 /* Processing.NDI.FrameSync.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Processing.NDI.FrameSync.h; sourceTree = "<group>"; };
+		AF6BD8F32E45D47C005B3991 /* Processing.NDI.Lib.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Processing.NDI.Lib.h; sourceTree = "<group>"; };
+		AF6BD8F42E45D47C005B3991 /* Processing.NDI.Lib.cplusplus.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Processing.NDI.Lib.cplusplus.h; sourceTree = "<group>"; };
+		AF6BD8F52E45D47C005B3991 /* Processing.NDI.Recv.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Processing.NDI.Recv.h; sourceTree = "<group>"; };
+		AF6BD8F62E45D47C005B3991 /* Processing.NDI.Recv.ex.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Processing.NDI.Recv.ex.h; sourceTree = "<group>"; };
+		AF6BD8F72E45D47C005B3991 /* Processing.NDI.RecvAdvertiser.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Processing.NDI.RecvAdvertiser.h; sourceTree = "<group>"; };
+		AF6BD8F82E45D47C005B3991 /* Processing.NDI.RecvListener.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Processing.NDI.RecvListener.h; sourceTree = "<group>"; };
+		AF6BD8F92E45D47C005B3991 /* Processing.NDI.Routing.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Processing.NDI.Routing.h; sourceTree = "<group>"; };
+		AF6BD8FA2E45D47C005B3991 /* Processing.NDI.Send.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Processing.NDI.Send.h; sourceTree = "<group>"; };
+		AF6BD8FB2E45D47C005B3991 /* Processing.NDI.structs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Processing.NDI.structs.h; sourceTree = "<group>"; };
+		AF6BD8FC2E45D47C005B3991 /* Processing.NDI.utilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Processing.NDI.utilities.h; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		AF6BD9022E45D8A0005B3991 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				libndi.dylib,
+			);
+			target = 6DC0444D2801877F00281728 /* VisionCastXD */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		AF6BD9002E45D590005B3991 /* PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			attributesByRelativePath = {
+				libndi.dylib = (
+					CodeSignOnCopy,
+				);
+			};
+			buildPhase = AF6BD8FE2E45D582005B3991 /* CopyFiles */;
+			membershipExceptions = (
+				libndi.dylib,
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		AF6BD8CD2E45C889005B3991 /* Frameworks */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (AF6BD9022E45D8A0005B3991 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, AF6BD9002E45D590005B3991 /* PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = Frameworks; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		6DC0444B2801877F00281728 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AF6BD8DA2E45CC27005B3991 /* ReSwift in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		6D2F1483280C201B00A3A2E5 /* Backend */ = {
+			isa = PBXGroup;
+			children = (
+				6D2F1487280C20D000A3A2E5 /* AppState.swift */,
+				6D2F1488280C20D000A3A2E5 /* SideEffectsMiddleware.swift */,
+				6D2F1489280C20D000A3A2E5 /* Store.swift */,
+				6D68E1AD287ABB6F00CD574A /* ScreenConfiguration */,
+				6D41B09D2879FA87007CEB2F /* MouseLocation */,
+			);
+			path = Backend;
+			sourceTree = "<group>";
+		};
+		6D2F1484280C202700A3A2E5 /* Frontend */ = {
+			isa = PBXGroup;
+			children = (
+				6D41B0A22879FB88007CEB2F /* Screen */,
+			);
+			path = Frontend;
+			sourceTree = "<group>";
+		};
+		6D41B09D2879FA87007CEB2F /* MouseLocation */ = {
+			isa = PBXGroup;
+			children = (
+				6D41B09E2879FAB6007CEB2F /* MouseLocationSideEffect.swift */,
+				6D41B0A02879FABE007CEB2F /* MouseLocationState.swift */,
+			);
+			path = MouseLocation;
+			sourceTree = "<group>";
+		};
+		6D41B0A22879FB88007CEB2F /* Screen */ = {
+			isa = PBXGroup;
+			children = (
+				AF6BD8C32E45B7A3005B3991 /* CustomResolutionViewController.swift */,
+				6D2F148D280C211E00A3A2E5 /* ScreenViewController.swift */,
+				6D41B0A32879FBA8007CEB2F /* ScreenViewData.swift */,
+				AF6BD8C12E45B793005B3991 /* CustomResolutionWindowController.swift */,
+			);
+			path = Screen;
+			sourceTree = "<group>";
+		};
+		6D68E1AD287ABB6F00CD574A /* ScreenConfiguration */ = {
+			isa = PBXGroup;
+			children = (
+				6D68E1AE287ABB9900CD574A /* ScreenConfigurationSideEffect.swift */,
+				6D68E1B3287ABFC800CD574A /* ScreenConfigurationState.swift */,
+			);
+			path = ScreenConfiguration;
+			sourceTree = "<group>";
+		};
+		6D68E1B0287ABDAB00CD574A /* Helpers */ = {
+			isa = PBXGroup;
+			children = (
+				6D68E1B1287ABDB900CD574A /* NSScreen+Extensions.swift */,
+			);
+			path = Helpers;
+			sourceTree = "<group>";
+		};
+		6DC044452801877F00281728 = {
+			isa = PBXGroup;
+			children = (
+				6DC044502801877F00281728 /* VisionCastXD */,
+				AF6BD8C62E45C3EC005B3991 /* Frameworks */,
+				6DC0444F2801877F00281728 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		6DC0444F2801877F00281728 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				6DC0444E2801877F00281728 /* VisionCastXD.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		6DC044502801877F00281728 /* VisionCastXD */ = {
+			isa = PBXGroup;
+			children = (
+				AF6BD8FD2E45D47C005B3991 /* Include */,
+				AF6BD8EC2E45D354005B3991 /* ForceLinkNDI.m */,
+				AF6BD8C92E45C487005B3991 /* NDISender.swift */,
+				AF6BD8C52E45BDCD005B3991 /* Info.plist */,
+				6DC04460280191EB00281728 /* main.swift */,
+				6D2F1485280C20C800A3A2E5 /* SubscriberViewController.swift */,
+				6DC044512801877F00281728 /* AppDelegate.swift */,
+				6D2F1483280C201B00A3A2E5 /* Backend */,
+				6D2F1484280C202700A3A2E5 /* Frontend */,
+				6D68E1B0287ABDAB00CD574A /* Helpers */,
+				6D36BEBA2801A40600EAB869 /* VisionCastXD-Bridging-Header.h */,
+				6D36BEB92801A39200EAB869 /* CGVirtualDisplayPrivate.h */,
+				6DC044552801878100281728 /* Assets.xcassets */,
+				6DC0445A2801878100281728 /* VisionCastXD.entitlements */,
+				AF6BD8CD2E45C889005B3991 /* Frameworks */,
+			);
+			path = VisionCastXD;
+			sourceTree = "<group>";
+		};
+		AF6BD8C62E45C3EC005B3991 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				AF6BD8C72E45C422005B3991 /* libndi.dylib */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		AF6BD8FD2E45D47C005B3991 /* Include */ = {
+			isa = PBXGroup;
+			children = (
+				AF6BD8EE2E45D47C005B3991 /* Processing.NDI.compat.h */,
+				AF6BD8EF2E45D47C005B3991 /* Processing.NDI.deprecated.h */,
+				AF6BD8F02E45D47C005B3991 /* Processing.NDI.DynamicLoad.h */,
+				AF6BD8F12E45D47C005B3991 /* Processing.NDI.Find.h */,
+				AF6BD8F22E45D47C005B3991 /* Processing.NDI.FrameSync.h */,
+				AF6BD8F32E45D47C005B3991 /* Processing.NDI.Lib.h */,
+				AF6BD8F42E45D47C005B3991 /* Processing.NDI.Lib.cplusplus.h */,
+				AF6BD8F52E45D47C005B3991 /* Processing.NDI.Recv.h */,
+				AF6BD8F62E45D47C005B3991 /* Processing.NDI.Recv.ex.h */,
+				AF6BD8F72E45D47C005B3991 /* Processing.NDI.RecvAdvertiser.h */,
+				AF6BD8F82E45D47C005B3991 /* Processing.NDI.RecvListener.h */,
+				AF6BD8F92E45D47C005B3991 /* Processing.NDI.Routing.h */,
+				AF6BD8FA2E45D47C005B3991 /* Processing.NDI.Send.h */,
+				AF6BD8FB2E45D47C005B3991 /* Processing.NDI.structs.h */,
+				AF6BD8FC2E45D47C005B3991 /* Processing.NDI.utilities.h */,
+			);
+			path = Include;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		6DC0444D2801877F00281728 /* VisionCastXD */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6DC0445D2801878100281728 /* Build configuration list for PBXNativeTarget "VisionCastXD" */;
+			buildPhases = (
+				6D2F147F280C1C1400A3A2E5 /* Run SwiftFormat */,
+				6DC0444A2801877F00281728 /* Sources */,
+				6DC0444B2801877F00281728 /* Frameworks */,
+				6DC0444C2801877F00281728 /* Resources */,
+				AF6BD8FE2E45D582005B3991 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VisionCastXD;
+			packageProductDependencies = (
+				AF6BD8D92E45CC27005B3991 /* ReSwift */,
+			);
+			productName = VisionCastVirtualDisplay;
+			productReference = 6DC0444E2801877F00281728 /* VisionCastXD.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		6DC044462801877F00281728 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1320;
+				LastUpgradeCheck = 1320;
+				TargetAttributes = {
+					6DC0444D2801877F00281728 = {
+						CreatedOnToolsVersion = 13.2.1;
+					};
+				};
+			};
+			buildConfigurationList = 6DC044492801877F00281728 /* Build configuration list for PBXProject "VisionCastXD" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 6DC044452801877F00281728;
+			packageReferences = (
+				AF6BD8D82E45CC27005B3991 /* XCRemoteSwiftPackageReference "ReSwift" */,
+			);
+			preferredProjectObjectVersion = 55;
+			productRefGroup = 6DC0444F2801877F00281728 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				6DC0444D2801877F00281728 /* VisionCastXD */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		6DC0444C2801877F00281728 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6DC044562801878100281728 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		6D2F147F280C1C1400A3A2E5 /* Run SwiftFormat */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Run SwiftFormat";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "cd BuildTools\nSDKROOT=(xcrun --sdk macosx --show-sdk-path)\n#swift package update #Uncomment this line temporarily to update the version used to the latest matching your BuildTools/Package.swift file\nswift run -c release swiftformat \"$SRCROOT\" --swiftversion \"5\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		6DC0444A2801877F00281728 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6D68E1B4287ABFC800CD574A /* ScreenConfigurationState.swift in Sources */,
+				AF6BD8ED2E45D355005B3991 /* ForceLinkNDI.m in Sources */,
+				6D68E1B2287ABDB900CD574A /* NSScreen+Extensions.swift in Sources */,
+				AF6BD8C42E45B7A4005B3991 /* CustomResolutionViewController.swift in Sources */,
+				AF6BD8C22E45B793005B3991 /* CustomResolutionWindowController.swift in Sources */,
+				6D2F148C280C20D000A3A2E5 /* Store.swift in Sources */,
+				6D2F1486280C20C800A3A2E5 /* SubscriberViewController.swift in Sources */,
+				AF6BD8CA2E45C488005B3991 /* NDISender.swift in Sources */,
+				6D68E1AF287ABB9900CD574A /* ScreenConfigurationSideEffect.swift in Sources */,
+				6D41B0A12879FABE007CEB2F /* MouseLocationState.swift in Sources */,
+				6D2F148A280C20D000A3A2E5 /* AppState.swift in Sources */,
+				6D2F148B280C20D000A3A2E5 /* SideEffectsMiddleware.swift in Sources */,
+				6D41B09F2879FAB6007CEB2F /* MouseLocationSideEffect.swift in Sources */,
+				6D41B0A42879FBA8007CEB2F /* ScreenViewData.swift in Sources */,
+				6D2F148E280C211E00A3A2E5 /* ScreenViewController.swift in Sources */,
+				6DC044522801877F00281728 /* AppDelegate.swift in Sources */,
+				6DC04461280191EB00281728 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		6DC0445B2801878100281728 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OBJC_BRIDGING_HEADER = "VisionCastVirtualDisplay/VisionCastVirtualDisplay-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		6DC0445C2801878100281728 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OBJC_BRIDGING_HEADER = "VisionCastVirtualDisplay/VisionCastVirtualDisplay-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+		6DC0445E2801878100281728 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = VisionCastVirtualDisplay/VisionCastVirtualDisplay.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = J7V7HV5L9G;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/VisionCastVirtualDisplay/Include";
+				INFOPLIST_FILE = VisionCastVirtualDisplay/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/VisionCastVirtualDisplay/Frameworks";
+				MARKETING_VERSION = 1.3.2;
+				OTHER_LDFLAGS = (
+					"-lndi",
+					"-headerpad_max_install_names",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = io.visioncast.xd;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/VisionCastVirtualDisplay/VisionCastVirtualDisplay-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		6DC0445F2801878100281728 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = VisionCastVirtualDisplay/VisionCastVirtualDisplay.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = J7V7HV5L9G;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/VisionCastVirtualDisplay/Include";
+				INFOPLIST_FILE = VisionCastVirtualDisplay/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/VisionCastVirtualDisplay/Frameworks";
+				MARKETING_VERSION = 1.3.2;
+				OTHER_LDFLAGS = (
+					"-lndi",
+					"-headerpad_max_install_names",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = io.visioncast.xd;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/VisionCastVirtualDisplay/VisionCastVirtualDisplay-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		6DC044492801877F00281728 /* Build configuration list for PBXProject "VisionCastXD" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6DC0445B2801878100281728 /* Debug */,
+				6DC0445C2801878100281728 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		6DC0445D2801878100281728 /* Build configuration list for PBXNativeTarget "VisionCastXD" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6DC0445E2801878100281728 /* Debug */,
+				6DC0445F2801878100281728 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		AF6BD8D82E45CC27005B3991 /* XCRemoteSwiftPackageReference "ReSwift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ReSwift/ReSwift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.1.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AF6BD8D92E45CC27005B3991 /* ReSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AF6BD8D82E45CC27005B3991 /* XCRemoteSwiftPackageReference "ReSwift" */;
+			productName = ReSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 6DC044462801877F00281728 /* Project object */;
+}
