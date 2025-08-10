@@ -54,7 +54,7 @@
 		6D68E1AE287ABB9900CD574A /* ScreenConfigurationSideEffect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenConfigurationSideEffect.swift; sourceTree = "<group>"; };
 		6D68E1B1287ABDB900CD574A /* NSScreen+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSScreen+Extensions.swift"; sourceTree = "<group>"; };
 		6D68E1B3287ABFC800CD574A /* ScreenConfigurationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenConfigurationState.swift; sourceTree = "<group>"; };
-		6DC0444E2801877F00281728 /* VisionCastXD.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VisionCastXD.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6DC0444E2801877F00281728 /* Vision Cast XD.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Vision Cast XD.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		6DC044512801877F00281728 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		6DC044552801878100281728 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6DC0445A2801878100281728 /* VisionCastXD.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VisionCastXD.entitlements; sourceTree = "<group>"; };
@@ -88,7 +88,7 @@
 			membershipExceptions = (
 				libndi.dylib,
 			);
-			target = 6DC0444D2801877F00281728 /* VisionCastXD */;
+			target = 6DC0444D2801877F00281728 /* Vision Cast XD */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -192,7 +192,7 @@
 		6DC0444F2801877F00281728 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				6DC0444E2801877F00281728 /* VisionCastXD.app */,
+				6DC0444E2801877F00281728 /* Vision Cast XD.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -252,9 +252,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		6DC0444D2801877F00281728 /* VisionCastXD */ = {
+		6DC0444D2801877F00281728 /* Vision Cast XD */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 6DC0445D2801878100281728 /* Build configuration list for PBXNativeTarget "VisionCastXD" */;
+			buildConfigurationList = 6DC0445D2801878100281728 /* Build configuration list for PBXNativeTarget "Vision Cast XD" */;
 			buildPhases = (
 				6D2F147F280C1C1400A3A2E5 /* Run SwiftFormat */,
 				6DC0444A2801877F00281728 /* Sources */,
@@ -266,12 +266,12 @@
 			);
 			dependencies = (
 			);
-			name = VisionCastXD;
+			name = "Vision Cast XD";
 			packageProductDependencies = (
 				AF6BD8D92E45CC27005B3991 /* ReSwift */,
 			);
 			productName = VisionCastVirtualDisplay;
-			productReference = 6DC0444E2801877F00281728 /* VisionCastXD.app */;
+			productReference = 6DC0444E2801877F00281728 /* Vision Cast XD.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -305,7 +305,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				6DC0444D2801877F00281728 /* VisionCastXD */,
+				6DC0444D2801877F00281728 /* Vision Cast XD */,
 			);
 		};
 /* End PBXProject section */
@@ -492,22 +492,23 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = VisionCastVirtualDisplay/VisionCastVirtualDisplay.entitlements;
+				CODE_SIGN_ENTITLEMENTS = VisionCastXD/VisionCastXD.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = J7V7HV5L9G;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				HEADER_SEARCH_PATHS = "$(SRCROOT)/VisionCastVirtualDisplay/Include";
-				INFOPLIST_FILE = VisionCastVirtualDisplay/Info.plist;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/VisionCastXD/Include";
+				INFOPLIST_FILE = VisionCastXD/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/VisionCastVirtualDisplay/Frameworks";
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/VisionCastXD/Frameworks";
 				MARKETING_VERSION = 1.3.2;
 				OTHER_LDFLAGS = (
 					"-lndi",
@@ -516,7 +517,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = io.visioncast.xd;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/VisionCastVirtualDisplay/VisionCastVirtualDisplay-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/VisionCastXD/VisionCastXD-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -526,22 +527,23 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = VisionCastVirtualDisplay/VisionCastVirtualDisplay.entitlements;
+				CODE_SIGN_ENTITLEMENTS = VisionCastXD/VisionCastXD.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = J7V7HV5L9G;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				HEADER_SEARCH_PATHS = "$(SRCROOT)/VisionCastVirtualDisplay/Include";
-				INFOPLIST_FILE = VisionCastVirtualDisplay/Info.plist;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/VisionCastXD/Include";
+				INFOPLIST_FILE = VisionCastXD/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/VisionCastVirtualDisplay/Frameworks";
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/VisionCastXD/Frameworks";
 				MARKETING_VERSION = 1.3.2;
 				OTHER_LDFLAGS = (
 					"-lndi",
@@ -550,7 +552,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = io.visioncast.xd;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/VisionCastVirtualDisplay/VisionCastVirtualDisplay-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/VisionCastXD/VisionCastXD-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
@@ -567,7 +569,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		6DC0445D2801878100281728 /* Build configuration list for PBXNativeTarget "VisionCastXD" */ = {
+		6DC0445D2801878100281728 /* Build configuration list for PBXNativeTarget "Vision Cast XD" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6DC0445E2801878100281728 /* Debug */,

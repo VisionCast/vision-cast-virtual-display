@@ -16,8 +16,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "6DC0444D2801877F00281728"
-               BuildableName = "VisionCastXD.app"
-               BlueprintName = "VisionCastXD"
+               BuildableName = "Vision Cast XD.app"
+               BlueprintName = "Vision Cast XD"
                ReferencedContainer = "container:VisionCastXD.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -45,8 +45,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "6DC0444D2801877F00281728"
-            BuildableName = "VisionCastXD.app"
-            BlueprintName = "VisionCastXD"
+            BuildableName = "Vision Cast XD.app"
+            BlueprintName = "Vision Cast XD"
             ReferencedContainer = "container:VisionCastXD.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -62,8 +62,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "6DC0444D2801877F00281728"
-            BuildableName = "VisionCastXD.app"
-            BlueprintName = "VisionCastXD"
+            BuildableName = "Vision Cast XD.app"
+            BlueprintName = "Vision Cast XD"
             ReferencedContainer = "container:VisionCastXD.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
