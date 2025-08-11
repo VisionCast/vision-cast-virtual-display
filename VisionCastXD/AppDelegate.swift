@@ -67,6 +67,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         window.makeKeyAndOrderFront(nil)
 
+        // Inicia o envio NDI de TODAS as telas físicas (além da virtual)
+        // Requer permissão de Screen Recording na primeira execução.
+        if ndiInitialized {
+            MultiDisplayNDIManager.shared.startAllDisplays()
+        }
+
         // Logs para debug
         if let screen = window.screen {
             print("Window is on screen with frame: \(screen.frame)")
@@ -141,6 +147,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_: Notification) {
+        // Pare os streams de todos os monitores antes de destruir a NDI
+        MultiDisplayNDIManager.shared.stopAll()
+
         if ndiInitialized {
             NDIlib_destroy()
         }
