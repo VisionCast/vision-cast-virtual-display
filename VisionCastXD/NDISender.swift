@@ -7,32 +7,34 @@ class NDISender {
     private var width: Int
     private var height: Int
 
+    // Guarde o nome como C string viva
+    private var nameCString: UnsafeMutablePointer<CChar>?
+
     init?(name: String, width: Int, height: Int) {
         self.width = width
         self.height = height
 
-        // 1. Inicializa NDI e verifica retorno
-        guard NDIlib_initialize() else {
-            print("❌ NDI initialization failed")
+        // Aloca uma cópia C do nome (zero-terminated)
+        nameCString = strdup(name)
+        guard let nameCString else {
+            print("❌ Falha ao alocar C string para nome NDI")
             return nil
         }
 
-        // 2. Prepara struct createDesc
         var createDesc = NDIlib_send_create_t()
-        createDesc.p_ndi_name = (name as NSString).utf8String
+        // Converta explicitamente para UnsafePointer<CChar>
+        createDesc.p_ndi_name = UnsafePointer(nameCString)
         createDesc.p_groups = nil
         createDesc.clock_video = true
         createDesc.clock_audio = false
 
-        // 3. Cria o sender NDI
         sendInstance = NDIlib_send_create(&createDesc)
-
-        guard sendInstance != nil else {
+        guard let sendInstance else {
             print("❌ Failed to create NDI sender instance")
             return nil
         }
 
-        // 4. Inicializa a estrutura do frame com BGRA
+        // Inicializa a estrutura do frame com BGRA
         videoFrame = NDIlib_video_frame_v2_t()
         videoFrame.xres = Int32(width)
         videoFrame.yres = Int32(height)
@@ -47,7 +49,7 @@ class NDISender {
     }
 
     func send(image: CGImage) {
-        guard let sendInstance = sendInstance else { return }
+        guard let sendInstance else { return }
 
         let bytesPerRow = width * 4
         let bufferSize = bytesPerRow * height
@@ -79,9 +81,11 @@ class NDISender {
     }
 
     deinit {
-        if let sendInstance = sendInstance {
+        if let sendInstance {
             NDIlib_send_destroy(sendInstance)
         }
-        NDIlib_destroy()
+        if let nameCString {
+            free(nameCString)
+        }
     }
 }

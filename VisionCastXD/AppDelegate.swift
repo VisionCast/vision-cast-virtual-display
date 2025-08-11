@@ -7,8 +7,20 @@ enum AppDelegateAction: Action {
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!
+    private var ndiInitialized = false // <- adicionada
 
     func applicationDidFinishLaunching(_: Notification) {
+        // Se estiver usando o header "Processing.NDI.DynamicLoad.h", primeiro carregue:
+        // if !NDIlib_v5_load() { print("Falha ao carregar NDI (DynamicLoad)"); return }
+
+        // Inicializa NDI antes de qualquer uso (ex.: NDIlib_send_create)
+        if NDIlib_initialize() {
+            ndiInitialized = true
+            print("NDI inicializado com sucesso")
+        } else {
+            print("Falha ao inicializar NDI")
+        }
+
         let viewController = ScreenViewController()
 
         // Lê resolução custom ou usa default
@@ -126,5 +138,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("Requested size: \(width)x\(height)")
         print("Backing scale factor: \(backingScale)")
         print("Applied frame: \(window.frame)")
+    }
+
+    func applicationWillTerminate(_: Notification) {
+        if ndiInitialized {
+            NDIlib_destroy()
+        }
     }
 }
