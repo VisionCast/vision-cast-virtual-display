@@ -13,7 +13,13 @@ class ScreenViewController: SubscriberViewController<ScreenViewData>, NSWindowDe
     private var isWindowHighlighted = false
     private var previousResolution: CGSize?
     private var previousScaleFactor: CGFloat?
-    private lazy var ciContext = CIContext(options: nil)
+    private lazy var ciContext: CIContext = {
+        let srgb = CGColorSpace(name: CGColorSpace.sRGB)!
+        return CIContext(options: [
+            .workingColorSpace: srgb,
+            .outputColorSpace: srgb,
+        ])
+    }()
 
     // Cria a view raiz quando não há XIB
     override func loadView() {

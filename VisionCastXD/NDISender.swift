@@ -6,15 +6,12 @@ class NDISender {
     private var videoFrame: NDIlib_video_frame_v2_t
     private var width: Int
     private var height: Int
-
-    // Guarde o nome como C string viva
     private var nameCString: UnsafeMutablePointer<CChar>?
 
     init?(name: String, width: Int, height: Int) {
         self.width = width
         self.height = height
 
-        // Aloca uma cópia C do nome (zero-terminated)
         nameCString = strdup(name)
         guard let nameCString else {
             print("❌ Falha ao alocar C string para nome NDI")
@@ -22,7 +19,6 @@ class NDISender {
         }
 
         var createDesc = NDIlib_send_create_t()
-        // Converta explicitamente para UnsafePointer<CChar>
         createDesc.p_ndi_name = UnsafePointer(nameCString)
         createDesc.p_groups = nil
         createDesc.clock_video = true
@@ -34,7 +30,7 @@ class NDISender {
             return nil
         }
 
-        // Inicializa a estrutura do frame com BGRA
+        // Configura o frame para BGRA
         videoFrame = NDIlib_video_frame_v2_t()
         videoFrame.xres = Int32(width)
         videoFrame.yres = Int32(height)
@@ -58,20 +54,25 @@ class NDISender {
             return
         }
 
+        // BGRA: little-endian + premultipliedFirst
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)! // sRGB consistente
+        let bitmapInfo = CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue
+
         guard let context = CGContext(
             data: bitmapData,
             width: width,
             height: height,
             bitsPerComponent: 8,
             bytesPerRow: bytesPerRow,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            space: colorSpace,
+            bitmapInfo: bitmapInfo
         ) else {
             free(bitmapData)
             print("❌ Failed to create CGContext")
             return
         }
 
+        // Desenha a imagem no buffer BGRA
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
 
         videoFrame.p_data = bitmapData.assumingMemoryBound(to: UInt8.self)
