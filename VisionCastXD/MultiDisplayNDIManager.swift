@@ -33,7 +33,6 @@ final class MultiDisplayNDIManager {
         let old = selectedDisplayUUIDs
         selectedDisplayUUIDs = uuids
 
-        // Se ficar vazio: encerra tudo já (encerra anúncio NDI também)
         if uuids.isEmpty {
             stopAll()
             print("NDI: seleção vazia — todos pipelines parados")
@@ -44,18 +43,12 @@ final class MultiDisplayNDIManager {
 
         let toStop = old.subtracting(uuids)
         for u in toStop {
-            if let id = map[u] {
-                stopPipeline(for: id)
-                print("NDI: parou (delta) \(id) para UUID \(u)")
-            }
+            if let id = map[u] { stopPipeline(for: id) }
         }
 
         let toStart = uuids.subtracting(old)
         for u in toStart {
-            if let id = map[u] {
-                startPipeline(for: id)
-                print("NDI: iniciou (delta) \(id) para UUID \(u)")
-            }
+            if let id = map[u] { startPipeline(for: id) }
         }
 
         let activeIDs = pipelines.keys.map { Int($0) }.sorted()
@@ -65,7 +58,7 @@ final class MultiDisplayNDIManager {
     func stopAll() {
         for (id, p) in pipelines {
             p.stream.stop()
-            p.sender.shutdown() // <- destrói explicitamente
+            p.sender.shutdown()
             print("NDI: parou \(id)")
         }
         pipelines.removeAll()
@@ -73,7 +66,13 @@ final class MultiDisplayNDIManager {
             NotificationCenter.default.removeObserver(self, name: NSApplication.didChangeScreenParametersNotification, object: nil)
             observingDisplayChanges = false
         }
-        print("NDI: todos os pipelines encerrados")
+    }
+
+    // Permite reabrir o sender com o novo nome (ex.: após renomear virtual)
+    func refreshSenderName(for displayID: CGDirectDisplayID) {
+        guard pipelines[displayID] != nil else { return }
+        stopPipeline(for: displayID)
+        startPipeline(for: displayID)
     }
 
     private func applySelection() {
@@ -81,16 +80,10 @@ final class MultiDisplayNDIManager {
         let selectedIDsSet = Set(selectedDisplayUUIDs.compactMap { map[$0] })
 
         let idsToStop = Set(pipelines.keys).subtracting(selectedIDsSet)
-        for id in idsToStop {
-            stopPipeline(for: id)
-            print("NDI: parou (sync) \(id)")
-        }
+        for id in idsToStop { stopPipeline(for: id) }
 
         let idsToStart = selectedIDsSet.subtracting(Set(pipelines.keys))
-        for id in idsToStart {
-            startPipeline(for: id)
-            print("NDI: iniciou (sync) \(id)")
-        }
+        for id in idsToStart { startPipeline(for: id) }
 
         let activeIDs = pipelines.keys.map { Int($0) }.sorted()
         print("NDI: seleção(sync)=\(selectedDisplayUUIDs.count) | ativos=\(activeIDs)")
@@ -101,8 +94,8 @@ final class MultiDisplayNDIManager {
         var activeDisplays = [CGDirectDisplayID](repeating: 0, count: Int(max))
         var count: UInt32 = 0
         guard CGGetActiveDisplayList(max, &activeDisplays, &count) == .success else { return [:] }
-
         let list = Array(activeDisplays.prefix(Int(count)))
+
         var map: [String: CGDirectDisplayID] = [:]
         for id in list {
             if let cf = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue() {
@@ -113,6 +106,22 @@ final class MultiDisplayNDIManager {
         return map
     }
 
+    private func displayFriendlyName(for displayID: CGDirectDisplayID) -> String {
+        // Se for virtual gerenciado, usa o nome da config
+        if let name = VirtualDisplayManager.shared.nameForDisplayID(displayID) {
+            return name
+        }
+        // Caso contrário tenta pegar o nome do NSScreen
+        for screen in NSScreen.screens {
+            if let num = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber,
+               CGDirectDisplayID(num.uint32Value) == displayID
+            {
+                return screen.localizedName
+            }
+        }
+        return "Display \(displayID)"
+    }
+
     private func startPipeline(for displayID: CGDirectDisplayID) {
         if pipelines[displayID] != nil { return }
 
@@ -120,9 +129,9 @@ final class MultiDisplayNDIManager {
         let height = Int(CGDisplayPixelsHigh(displayID))
         guard width > 0, height > 0 else { return }
 
-        let name = "VisionCast NDI - \(displayID)"
+        let sourceName = "VisionCast NDI - \(displayFriendlyName(for: displayID))"
 
-        guard let sender = NDISender(name: name, width: width, height: height) else {
+        guard let sender = NDISender(name: sourceName, width: width, height: height) else {
             print("❌ NDI sender falhou para display \(displayID)")
             return
         }
@@ -151,13 +160,12 @@ final class MultiDisplayNDIManager {
 
         pipelines[displayID] = Pipeline(sender: sender, stream: stream)
         stream.start()
-        print("NDI: iniciou display \(displayID) \(width)x\(height)")
     }
 
     private func stopPipeline(for displayID: CGDirectDisplayID) {
         guard let p = pipelines.removeValue(forKey: displayID) else { return }
         p.stream.stop()
-        p.sender.shutdown() // <- destrói o sender (encerra anúncio NDI)
+        p.sender.shutdown()
     }
 
     @objc private func displaysChanged() {

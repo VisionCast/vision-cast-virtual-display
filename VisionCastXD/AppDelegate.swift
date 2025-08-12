@@ -1,7 +1,9 @@
 import Cocoa
 import ReSwift
 
-enum AppDelegateAction: Action { case didFinishLaunching }
+enum AppDelegateAction: Action {
+    case didFinishLaunching
+}
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     // Janela principal removida (não abrimos preview default)
@@ -14,7 +16,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let kSelectedDisplayUUIDs = "selectedDisplayUUIDs"
 
     func applicationDidFinishLaunching(_: Notification) {
-        if NDIlib_initialize() { ndiInitialized = true } else { print("Falha ao inicializar NDI") }
+        if NDIlib_initialize() {
+            ndiInitialized = true
+        } else {
+            print("Falha ao inicializar NDI")
+        }
 
         // Carrega configs; NÃO cria nenhum virtual automaticamente
         VirtualDisplayManager.shared.load()
@@ -27,7 +33,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         selected.formUnion(VirtualDisplayManager.shared.currentVirtualUUIDs())
         UserDefaults.standard.set(Array(selected), forKey: kSelectedDisplayUUIDs)
         MultiDisplayNDIManager.shared.setSelectedDisplays(selected)
-        if ndiInitialized { MultiDisplayNDIManager.shared.start() }
+        if ndiInitialized {
+            MultiDisplayNDIManager.shared.start()
+        }
 
         // Menu simples (somente “Sair”, opcional)
         let mainMenu = NSMenu()
@@ -47,15 +55,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // NDI
         sb.onToggleDisplay = { [weak self] displayID, isOn in
-            guard let self else { return }
-            guard let cf = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue() else { return }
+            guard let self else {
+                return
+            }
+            guard let cf = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue() else {
+                return
+            }
             let uuid = CFUUIDCreateString(nil, cf) as String
+
             var current = self.currentSelectedDisplayUUIDs()
-            if isOn { current.insert(uuid) } else { current.remove(uuid) }
+            if isOn {
+                current.insert(uuid)
+            } else {
+                current.remove(uuid)
+            }
             UserDefaults.standard.set(Array(current), forKey: self.kSelectedDisplayUUIDs)
             MultiDisplayNDIManager.shared.setSelectedDisplays(current)
+
+            // Atualiza a UI do menu imediatamente
+            self.statusBar?.refresh()
         }
-        sb.selectedUUIDsProvider = { [weak self] in self?.currentSelectedDisplayUUIDs() ?? [] }
+
+        sb.selectedUUIDsProvider = { [weak self] in
+            self?.currentSelectedDisplayUUIDs() ?? []
+        }
 
         // Displays Virtuais
         sb.virtualItemsProvider = {
@@ -64,8 +87,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         sb.onToggleVirtualItem = { [weak self] configID, _ in
-            guard let self else { return }
-            let item = VirtualDisplayManager.shared.listForMenu().first { $0.id == configID }
+            guard let self else {
+                return
+            }
+            let item = VirtualDisplayManager.shared.listForMenu().first {
+                $0.id == configID
+            }
             if item?.enabled == true {
                 // Desabilitar: remove do NDI e fecha preview
                 if let uuid = VirtualDisplayManager.shared.uuidString(for: configID) {
@@ -90,7 +117,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.statusBar?.refresh()
         }
         sb.onAddVirtualPreset = { [weak self] w, h in
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             let id = VirtualDisplayManager.shared.addVirtual(width: w, height: h, name: "Virtual \(w)x\(h)", enabled: true)
             if let did = VirtualDisplayManager.shared.cgDisplayID(for: id),
                let cf = CGDisplayCreateUUIDFromDisplayID(did)?.takeRetainedValue()
@@ -103,15 +132,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             self.statusBar?.refresh()
         }
-        sb.onAddVirtualCustom = { [weak self] in self?.promptAddCustomVirtual() }
-        sb.onRenameVirtual = { [weak self] id in self?.promptRenameVirtual(id: id) }
+        sb.onAddVirtualCustom = { [weak self] in
+            self?.promptAddCustomVirtual()
+        }
+        sb.onRenameVirtual = { [weak self] id in
+            self?.promptRenameVirtual(id: id)
+        }
         sb.onEditVirtualPreset = { [weak self] id, w, h in
             VirtualDisplayManager.shared.updateResolution(configID: id, width: w, height: h)
             self?.statusBar?.refresh()
         }
-        sb.onEditVirtualCustom = { [weak self] id in self?.promptEditResolutionVirtual(id: id) }
+        sb.onEditVirtualCustom = { [weak self] id in
+            self?.promptEditResolutionVirtual(id: id)
+        }
         sb.onRemoveVirtual = { [weak self] id in
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             if let uuid = VirtualDisplayManager.shared.uuidString(for: id) {
                 var cur = self.currentSelectedDisplayUUIDs()
                 cur.remove(uuid)
@@ -128,7 +165,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Dialogs utilitários
     private func promptAddCustomVirtual() {
         let (w, h) = promptResolution(defaultW: 1920, defaultH: 1080) ?? (0, 0)
-        guard w > 0, h > 0 else { return }
+        guard w > 0, h > 0 else {
+            return
+        }
         let id = VirtualDisplayManager.shared.addVirtual(width: w, height: h, name: "Virtual \(w)x\(h)", enabled: true)
         if let did = VirtualDisplayManager.shared.cgDisplayID(for: id),
            let cf = CGDisplayCreateUUIDFromDisplayID(did)?.takeRetainedValue()
@@ -154,16 +193,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         tf.frame = NSRect(x: 0, y: 0, width: 240, height: 24)
         alert.accessoryView = tf
 
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            return
+        }
         let name = tf.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
+        guard !name.isEmpty else {
+            return
+        }
         VirtualDisplayManager.shared.rename(configID: id, to: name)
         statusBar?.refresh()
     }
 
     private func promptEditResolutionVirtual(id: String) {
         let (w, h) = promptResolution(defaultW: 1920, defaultH: 1080) ?? (0, 0)
-        guard w > 0, h > 0 else { return }
+        guard w > 0, h > 0 else {
+            return
+        }
         VirtualDisplayManager.shared.updateResolution(configID: id, width: w, height: h)
         statusBar?.refresh()
     }
@@ -191,16 +236,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         accessory.addSubview(heightField)
         alert.accessoryView = accessory
 
-        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            return nil
+        }
         let w = Int(widthField.stringValue) ?? 0
         let h = Int(heightField.stringValue) ?? 0
-        guard w > 0, h > 0 else { return nil }
+        guard w > 0, h > 0 else {
+            return nil
+        }
         return (w, h)
     }
 
     private func currentSelectedDisplayUUIDs() -> Set<String> {
         let defaults = UserDefaults.standard
-        if let arr = defaults.array(forKey: kSelectedDisplayUUIDs) as? [String] { return Set(arr) }
+        if let arr = defaults.array(forKey: kSelectedDisplayUUIDs) as? [String] {
+            return Set(arr)
+        }
         return []
     }
 
@@ -209,12 +260,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let defaults = UserDefaults.standard
         let w = defaults.integer(forKey: kCustomWidth)
         let h = defaults.integer(forKey: kCustomHeight)
-        guard w > 0, h > 0 else { return }
+        guard w > 0, h > 0 else {
+            return
+        }
         // Sem janela principal padrão para redimensionar. Mantido para compatibilidade.
     }
 
     func applicationWillTerminate(_: Notification) {
         MultiDisplayNDIManager.shared.stopAll()
-        if ndiInitialized { NDIlib_destroy() }
+        if ndiInitialized {
+            NDIlib_destroy()
+        }
     }
 }

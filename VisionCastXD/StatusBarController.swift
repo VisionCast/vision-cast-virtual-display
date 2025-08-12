@@ -159,8 +159,10 @@ final class StatusBarController: NSObject {
 
     @objc private func toggleDisplayNDI(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? CGDirectDisplayID else { return }
-        let isOn = !(selectedUUIDsProvider?().contains(Self.uuidString(for: id) ?? "") ?? false)
-        onToggleDisplay?(id, isOn)
+        // Alterna o estado visual imediatamente
+        let newState: NSControl.StateValue = (sender.state == .on) ? .off : .on
+        sender.state = newState
+        onToggleDisplay?(id, newState == .on)
     }
 
     @objc private func toggleVirtual(_ sender: NSMenuItem) {

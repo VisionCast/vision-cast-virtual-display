@@ -119,18 +119,25 @@ final class VirtualDisplayManager {
         save()
     }
 
-    // Renomeia (atualiza config e título do preview)
+    // Retorna o nome configurado para um displayID (se for virtual gerenciado)
+    func nameForDisplayID(_ displayID: CGDirectDisplayID) -> String? {
+        if let pair = displaysByID.first(where: { $0.value.display.displayID == displayID }) {
+            return pair.value.config.name
+        }
+        return nil
+    }
+
     func rename(configID: String, to newName: String) {
         guard let idx = configs.firstIndex(where: { $0.id == configID }) else { return }
         configs[idx].name = newName
         save()
 
-        // Atualiza título do preview se existir
         previewsByID[configID]?.setTitle(newName)
 
-        // Atualiza também o name do runtime (não há API pública para renomear CGVirtualDisplay;
-        // o nome do display mostrado no sistema fica como no descriptor inicial)
-        // Usamos o título da janela/preview como referência visível para o usuário.
+        // Se estiver habilitado, peça para o NDI reiniciar o sender com o novo nome
+        if let did = cgDisplayID(for: configID) {
+            MultiDisplayNDIManager.shared.refreshSenderName(for: did)
+        }
     }
 
     // Muda resolução; se estiver habilitado, aplica no display e no preview
