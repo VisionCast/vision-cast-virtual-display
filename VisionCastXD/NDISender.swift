@@ -7,6 +7,11 @@ class NDISender {
     private var width: Int
     private var height: Int
     private var nameCString: UnsafeMutablePointer<CChar>?
+
+    // Buffer de áudio reutilizável
+    private var audioInterleaved: UnsafeMutablePointer<Float>?
+    private var audioCapacity: Int = 0
+
     private let audioEngine = AVAudioEngine()
 
     init?(name: String, width: Int, height: Int) {
@@ -14,10 +19,7 @@ class NDISender {
         self.height = height
 
         nameCString = strdup(name)
-        guard let nameCString else {
-            print("❌ Falha ao alocar C string para nome NDI")
-            return nil
-        }
+        guard let nameCString else { return nil }
 
         var createDesc = NDIlib_send_create_t()
         createDesc.p_ndi_name = UnsafePointer(nameCString)
@@ -26,10 +28,7 @@ class NDISender {
         createDesc.clock_audio = true
 
         sendInstance = NDIlib_send_create(&createDesc)
-        guard let sendInstance else {
-            print("❌ Failed to create NDI sender instance")
-            return nil
-        }
+        guard let sendInstance else { return nil }
 
         videoFrame = NDIlib_video_frame_v2_t()
         videoFrame.xres = Int32(width)
@@ -46,52 +45,35 @@ class NDISender {
         startAudioCapture()
     }
 
+    // Envia ponteiro BGRA já pronto (sem alocação/cópia extra)
+    func sendBGRA(bytes: UnsafePointer<UInt8>, bytesPerRow: Int) {
+        guard let sendInstance else { return }
+        var vf = videoFrame
+        vf.p_data = UnsafeMutablePointer<UInt8>(mutating: bytes)
+        vf.line_stride_in_bytes = Int32(bytesPerRow)
+        NDIlib_send_send_video_v2(sendInstance, &vf)
+    }
+
+    // Compatibilidade (menos eficiente)
     func send(image: CGImage) {
         guard let sendInstance else { return }
-
         let bytesPerRow = width * 4
         let bufferSize = bytesPerRow * height
-        guard let bitmapData = malloc(bufferSize) else {
-            print("❌ Failed to allocate memory for bitmapData")
-            return
-        }
+        guard let bitmapData = malloc(bufferSize) else { return }
 
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
         let bitmapInfo = CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue
 
-        guard let context = CGContext(
-            data: bitmapData,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: bytesPerRow,
-            space: colorSpace,
-            bitmapInfo: bitmapInfo
-        ) else {
-            free(bitmapData)
-            print("❌ Failed to create CGContext")
-            return
+        if let context = CGContext(data: bitmapData, width: width, height: height, bitsPerComponent: 8,
+                                   bytesPerRow: bytesPerRow, space: colorSpace, bitmapInfo: bitmapInfo)
+        {
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            var vf = videoFrame
+            vf.p_data = bitmapData.assumingMemoryBound(to: UInt8.self)
+            vf.line_stride_in_bytes = Int32(bytesPerRow)
+            NDIlib_send_send_video_v2(sendInstance, &vf)
         }
-
-        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-
-        videoFrame.p_data = bitmapData.assumingMemoryBound(to: UInt8.self)
-        NDIlib_send_send_video_v2(sendInstance, &videoFrame)
-
         free(bitmapData)
-    }
-
-    // Encerra imediatamente o anúncio NDI e captura de áudio
-    func shutdown() {
-        audioEngine.stop()
-        if let sendInstance {
-            NDIlib_send_destroy(sendInstance)
-            self.sendInstance = nil
-        }
-        if let nameCString {
-            free(nameCString)
-            self.nameCString = nil
-        }
     }
 
     private func startAudioCapture() {
@@ -104,48 +86,47 @@ class NDISender {
                                           channels: 2,
                                           interleaved: true)!
 
-        inputNode.installTap(onBus: bus, bufferSize: 1024, format: desiredFormat) { buffer, _ in
-            self.sendAudio(buffer: buffer)
+        inputNode.installTap(onBus: bus, bufferSize: 1024, format: desiredFormat) { [weak self] buffer, _ in
+            self?.sendAudio(buffer: buffer)
         }
 
-        do {
-            try audioEngine.start()
-            print("🎤 Captura de áudio iniciada")
-        } catch {
-            print("❌ Erro ao iniciar áudio: \(error)")
-        }
+        do { try audioEngine.start() } catch { print("❌ Erro ao iniciar áudio: \(error)") }
     }
 
     private func sendAudio(buffer: AVAudioPCMBuffer) {
         guard let sendInstance else { return }
         guard let channelData = buffer.floatChannelData else { return }
 
-        print("📢 Enviando áudio: frames=\(buffer.frameLength), canais=\(buffer.format.channelCount)")
-
         let frames = Int(buffer.frameLength)
         let channels = Int(buffer.format.channelCount)
-        let samplesCount = frames * 2 // stereo
+        let needed = frames * 2 // stereo
 
-        let interleaved = UnsafeMutablePointer<Float>.allocate(capacity: samplesCount)
+        // Garante capacidade do buffer
+        if audioCapacity < needed {
+            audioInterleaved?.deallocate()
+            audioInterleaved = UnsafeMutablePointer<Float>.allocate(capacity: needed)
+            audioCapacity = needed
+        }
+        guard let interleaved = audioInterleaved else { return }
 
         if channels == 2 {
             let left = channelData[0]
             let right = channelData[1]
-            for frame in 0 ..< frames {
-                interleaved[frame * 2] = left[frame]
-                interleaved[frame * 2 + 1] = right[frame]
+            var dst = 0
+            for i in 0 ..< frames {
+                interleaved[dst] = left[i]
+                interleaved[dst + 1] = right[i]
+                dst += 2
             }
-        } else if channels == 1 {
+        } else { // mono -> stereo
             let mono = channelData[0]
-            for frame in 0 ..< frames {
-                let sample = mono[frame]
-                interleaved[frame * 2] = sample
-                interleaved[frame * 2 + 1] = sample
+            var dst = 0
+            for i in 0 ..< frames {
+                let s = mono[i]
+                interleaved[dst] = s
+                interleaved[dst + 1] = s
+                dst += 2
             }
-        } else {
-            interleaved.deallocate()
-            print("⚠️ Número de canais não suportado: \(channels)")
-            return
         }
 
         var audioFrame = NDIlib_audio_frame_v2_t()
@@ -156,8 +137,27 @@ class NDISender {
         audioFrame.p_data = interleaved
 
         NDIlib_send_send_audio_v2(sendInstance, &audioFrame)
+    }
 
-        interleaved.deallocate()
+    // Torna explícito para permitir encerrar de fora (MultiDisplayNDIManager)
+    func shutdown() {
+        // áudio
+        audioEngine.stop()
+        if let inter = audioInterleaved {
+            inter.deallocate()
+            audioInterleaved = nil
+            audioCapacity = 0
+        }
+        // NDI
+        if let sendInstance {
+            NDIlib_send_destroy(sendInstance)
+            self.sendInstance = nil
+        }
+        // nome
+        if let nameCString {
+            free(nameCString)
+            self.nameCString = nil
+        }
     }
 
     deinit {

@@ -8,8 +8,8 @@ final class VirtualPreviewWindowController: NSWindowController, NSWindowDelegate
 
     private var stream: CGDisplayStream?
     private let contentView = NSView(frame: .zero)
+    private let streamQueue = DispatchQueue(label: "preview.stream.\(UUID().uuidString)", qos: .userInitiated)
 
-    // Chamado quando a janela for fechada
     private let onClose: () -> Void
 
     init(displayID: CGDirectDisplayID, pixelWidth: Int, pixelHeight: Int, title: String, onClose: @escaping () -> Void = {}) {
@@ -35,11 +35,7 @@ final class VirtualPreviewWindowController: NSWindowController, NSWindowDelegate
         window?.delegate = self
         window?.contentView = contentView
         contentView.wantsLayer = true
-        if let layer = contentView.layer {
-            layer.backgroundColor = NSColor.black.cgColor
-            layer.contentsScale = 1.0
-            layer.rasterizationScale = 1.0
-        }
+        contentView.layer?.backgroundColor = NSColor.black.cgColor
     }
 
     @available(*, unavailable)
@@ -47,17 +43,23 @@ final class VirtualPreviewWindowController: NSWindowController, NSWindowDelegate
 
     func start() {
         guard stream == nil else { return }
-        let props: CFDictionary = [CGDisplayStream.showCursor: true] as CFDictionary
+        let props: CFDictionary = [
+            CGDisplayStream.showCursor: true,
+            CGDisplayStream.minimumFrameTime: NSNumber(value: 1.0 / 60.0),
+        ] as CFDictionary
+
         stream = CGDisplayStream(
             dispatchQueueDisplay: displayID,
             outputWidth: pixelWidth,
             outputHeight: pixelHeight,
             pixelFormat: Int32(kCVPixelFormatType_32BGRA),
             properties: props,
-            queue: .main,
+            queue: streamQueue,
             handler: { [weak self] _, _, surface, _ in
                 guard let self, let surface else { return }
-                self.contentView.layer?.contents = surface
+                DispatchQueue.main.async {
+                    self.contentView.layer?.contents = surface
+                }
             }
         )
         stream?.start()
@@ -75,7 +77,6 @@ final class VirtualPreviewWindowController: NSWindowController, NSWindowDelegate
 
         let scale = window?.screen?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2.0
         let sizePoints = NSSize(width: CGFloat(w) / scale, height: CGFloat(h) / scale)
-
         if let win = window {
             win.setContentSize(sizePoints)
             win.contentAspectRatio = sizePoints
@@ -84,11 +85,8 @@ final class VirtualPreviewWindowController: NSWindowController, NSWindowDelegate
         start()
     }
 
-    func setTitle(_ title: String) {
-        window?.title = title
-    }
+    func setTitle(_ title: String) { window?.title = title }
 
-    // Ao fechar a janela do preview, pare stream e notifique o gerenciador (para matar NDI)
     func windowWillClose(_: Notification) {
         stop()
         onClose()
