@@ -7,7 +7,19 @@ final class StatusBarController: NSObject {
     var onToggleDisplay: ((CGDirectDisplayID, Bool) -> Void)?
     var selectedUUIDsProvider: (() -> Set<String>)?
 
-    // Use quadrado para ícone-only
+    // NOVO: gerenciamento de virtuais
+    struct VirtualItem {
+        let id: String
+        let title: String
+        let sizeText: String
+        let enabled: Bool
+    }
+
+    var virtualItemsProvider: (() -> [VirtualItem])?
+    var onToggleVirtualItem: ((String, Bool) -> Void)?
+    var onAddVirtualPreset: ((Int, Int) -> Void)?
+    var onAddVirtualCustom: (() -> Void)? // <- novo
+
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
     private let resolutions: [(label: String, w: Int, h: Int)] = [
@@ -22,23 +34,17 @@ final class StatusBarController: NSObject {
         if let button = statusItem.button {
             let custom = NSImage(named: "StatusBarIcon")
             let img = custom ?? NSImage(systemSymbolName: "display", accessibilityDescription: "VisionCast")
-
-            // Tamanho ideal: 18x18 pt (evita escala fracionária)
             img?.size = NSSize(width: 18, height: 18)
-
             button.image = img
             button.image?.isTemplate = true
             button.imageScaling = .scaleProportionallyDown
-            // Ajuste opcional:
-            // button.contentTintColor = .labelColor
         }
-
         statusItem.menu = buildMenu()
-        NotificationCenter.default.addObserver(self,
-                                               selector: #selector(rebuildMenu),
-                                               name: NSApplication.didChangeScreenParametersNotification,
-                                               object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(rebuildMenu),
+                                               name: NSApplication.didChangeScreenParametersNotification, object: nil)
     }
+
+    func refresh() { rebuildMenu() }
 
     @objc private func rebuildMenu() {
         statusItem.menu = buildMenu()
@@ -47,7 +53,48 @@ final class StatusBarController: NSObject {
     private func buildMenu() -> NSMenu {
         let menu = NSMenu()
 
-        // Seção: Resolução
+        // Displays Virtuais
+        let vTitle = NSMenuItem()
+        vTitle.title = "Displays Virtuais"
+        vTitle.isEnabled = false
+        menu.addItem(vTitle)
+
+        let vItems = virtualItemsProvider?() ?? []
+        if vItems.isEmpty {
+            let empty = NSMenuItem()
+            empty.title = "Nenhum virtual configurado"
+            empty.isEnabled = false
+            menu.addItem(empty)
+        } else {
+            for it in vItems {
+                let item = NSMenuItem(title: "\(it.title) (\(it.sizeText))", action: #selector(toggleVirtual(_:)), keyEquivalent: "")
+                item.target = self
+                item.state = it.enabled ? .on : .off
+                item.representedObject = it.id
+                menu.addItem(item)
+            }
+        }
+
+        // Adicionar (presets + Personalizar…)
+        let addSub = NSMenu(title: "Adicionar Display Virtual")
+        for r in resolutions {
+            let sub = NSMenuItem(title: r.label, action: #selector(addVirtualPreset(_:)), keyEquivalent: "")
+            sub.target = self
+            sub.representedObject = ["w": r.w, "h": r.h]
+            addSub.addItem(sub)
+        }
+        addSub.addItem(.separator())
+        let custom = NSMenuItem(title: "Personalizar…", action: #selector(addVirtualCustom), keyEquivalent: "")
+        custom.target = self
+        addSub.addItem(custom)
+
+        let addRoot = NSMenuItem(title: "Adicionar Display Virtual", action: nil, keyEquivalent: "")
+        addRoot.submenu = addSub
+        menu.addItem(addRoot)
+
+        menu.addItem(.separator())
+
+        // Resolução da janela/preview
         let titleRes = NSMenuItem()
         titleRes.title = "Resolução"
         titleRes.isEnabled = false
@@ -59,27 +106,25 @@ final class StatusBarController: NSObject {
             item.representedObject = ["w": r.w, "h": r.h]
             menu.addItem(item)
         }
-
         let customize = NSMenuItem(title: "Personalizar…", action: #selector(openCustomResolution), keyEquivalent: "")
         customize.target = self
         menu.addItem(customize)
 
         menu.addItem(.separator())
 
-        // Seção: Telas NDI
+        // NDI • Telas compartilhadas
         let titleNDI = NSMenuItem()
         titleNDI.title = "NDI • Telas compartilhadas"
         titleNDI.isEnabled = false
         menu.addItem(titleNDI)
 
         let selected = selectedUUIDsProvider?() ?? []
-
         for info in Self.activeDisplaysInfo() {
             let label = "\(info.name) (\(info.width)x\(info.height))"
             let item = NSMenuItem(title: label, action: #selector(toggleDisplayNDI(_:)), keyEquivalent: "")
             item.target = self
             item.state = selected.contains(info.uuidString) ? .on : .off
-            item.representedObject = info.id // guardamos o CGDirectDisplayID
+            item.representedObject = info.id
             menu.addItem(item)
         }
 
@@ -88,39 +133,45 @@ final class StatusBarController: NSObject {
         quit.keyEquivalentModifierMask = [.command]
         quit.target = self
         menu.addItem(quit)
+
         return menu
     }
 
     @objc private func didPickResolution(_ sender: NSMenuItem) {
-        guard
-            let dict = sender.representedObject as? [String: Int],
-            let w = dict["w"],
-            let h = dict["h"]
-        else {
-            return
-        }
+        guard let dict = sender.representedObject as? [String: Int],
+              let w = dict["w"], let h = dict["h"] else { return }
         onPickResolution?(w, h)
     }
 
-    @objc private func openCustomResolution() {
-        onOpenCustomResolution?()
-    }
+    @objc private func openCustomResolution() { onOpenCustomResolution?() }
 
     @objc private func toggleDisplayNDI(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? CGDirectDisplayID else {
-            return
-        }
+        guard let id = sender.representedObject as? CGDirectDisplayID else { return }
         let newState: NSControl.StateValue = (sender.state == .on) ? .off : .on
         sender.state = newState
         onToggleDisplay?(id, newState == .on)
     }
 
-    @objc private func quitApp() {
-        NSApp.terminate(nil)
+    @objc private func toggleVirtual(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        let newState: NSControl.StateValue = (sender.state == .on) ? .off : .on
+        sender.state = newState
+        onToggleVirtualItem?(id, newState == .on)
     }
 
-    // Utilidades
+    @objc private func addVirtualPreset(_ sender: NSMenuItem) {
+        guard let dict = sender.representedObject as? [String: Int],
+              let w = dict["w"], let h = dict["h"] else { return }
+        onAddVirtualPreset?(w, h)
+    }
 
+    @objc private func addVirtualCustom() {
+        onAddVirtualCustom?()
+    }
+
+    @objc private func quitApp() { NSApp.terminate(nil) }
+
+    // Utilidades (inalterado)
     struct DisplayInfo {
         let id: CGDirectDisplayID
         let uuidString: String
@@ -134,29 +185,19 @@ final class StatusBarController: NSObject {
         var active = [CGDirectDisplayID](repeating: 0, count: Int(max))
         var count: UInt32 = 0
         let err = CGGetActiveDisplayList(max, &active, &count)
-        guard err == .success else {
-            return []
-        }
+        guard err == .success else { return [] }
         let list = Array(active.prefix(Int(count)))
 
-        // Mapeia NSScreen -> nome amigável
         var namesByID: [CGDirectDisplayID: String] = [:]
         for screen in NSScreen.screens {
-            if
-                let num = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
-            {
+            if let num = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber {
                 let did = CGDirectDisplayID(num.uint32Value)
-                let name = screen.localizedName
-                namesByID[did] = name
+                namesByID[did] = screen.localizedName
             }
         }
 
         return list.compactMap { id in
-            guard
-                let cfUUID = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue()
-            else {
-                return nil
-            }
+            guard let cfUUID = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue() else { return nil }
             let uuidStr = (CFUUIDCreateString(nil, cfUUID) as String)
             let w = Int(CGDisplayPixelsWide(id))
             let h = Int(CGDisplayPixelsHigh(id))

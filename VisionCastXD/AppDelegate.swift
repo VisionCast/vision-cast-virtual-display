@@ -9,7 +9,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!
     private var ndiInitialized = false
     private var statusBar: StatusBarController?
-    private var screenVC: ScreenViewController! // <- manter referência
+    private var screenVC: ScreenViewController!
 
     private let kCustomWidth = "customWidth"
     private let kCustomHeight = "customHeight"
@@ -23,6 +23,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             print("Falha ao inicializar NDI")
         }
 
+        // Carrega configs e cria TODOS os virtuais habilitados (com preview)
+        VirtualDisplayManager.shared.load()
+        VirtualDisplayManager.shared.createAllEnabled()
+
+        // Janela/preview principal existente
         let viewController = ScreenViewController()
         screenVC = viewController
 
@@ -40,7 +45,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
-
         window.contentViewController = viewController
         window.delegate = viewController
         window.title = "Vision Cast XD"
@@ -52,7 +56,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.contentMaxSize = CGSize(width: 3840, height: 2160)
         window.styleMask.insert(.resizable)
         window.collectionBehavior.insert(.fullScreenNone)
-
         window.contentView?.wantsLayer = true
         if let layer = window.contentView?.layer {
             layer.contentsScale = 1.0
@@ -65,13 +68,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         setupStatusBar()
 
-        let selected = loadOrCreateDefaultSelectedDisplayUUIDs()
+        // Seleção NDI: mantém o que já tinha e soma os virtuais habilitados
+        var selected = currentSelectedDisplayUUIDs()
+        selected.formUnion(VirtualDisplayManager.shared.currentVirtualUUIDs())
+        UserDefaults.standard.set(Array(selected), forKey: kSelectedDisplayUUIDs)
         MultiDisplayNDIManager.shared.setSelectedDisplays(selected)
-        if ndiInitialized {
-            MultiDisplayNDIManager.shared.start()
-        }
+        if ndiInitialized { MultiDisplayNDIManager.shared.start() }
 
-        // Menu de app, atalho para "Custom Resolution..." e "Quit"
+        // Menu simples do app
         let mainMenu = NSMenu()
         let mainMenuItem = NSMenuItem()
         let subMenu = NSMenu(title: "MainMenu")
@@ -89,6 +93,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupStatusBar() {
         let sb = StatusBarController()
+
+        // Janela/preview principal
         sb.onPickResolution = { [weak self] w, h in
             guard let self else { return }
             let defaults = UserDefaults.standard
@@ -97,30 +103,118 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.applyPixelPerfectResolution(width: w, height: h)
             self.screenVC?.applyVirtualDisplayMode(width: w, height: h)
         }
-        sb.onOpenCustomResolution = { [weak self] in
-            self?.openCustomResolutionWindow()
-        }
+        sb.onOpenCustomResolution = { [weak self] in self?.openCustomResolutionWindow() }
+
+        // NDI displays
         sb.onToggleDisplay = { [weak self] displayID, isOn in
             guard let self else { return }
             guard let cf = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue() else { return }
             let uuid = CFUUIDCreateString(nil, cf) as String
-
             var current = self.currentSelectedDisplayUUIDs()
-            if isOn {
-                current.insert(uuid)
-            } else {
-                current.remove(uuid)
-            }
-
-            // IMPORTANTE: não force selecionar nada se ficar vazio.
-            // Se ficar vazio, paramos tudo.
+            if isOn { current.insert(uuid) } else { current.remove(uuid) }
             UserDefaults.standard.set(Array(current), forKey: self.kSelectedDisplayUUIDs)
             MultiDisplayNDIManager.shared.setSelectedDisplays(current)
         }
-        sb.selectedUUIDsProvider = { [weak self] in
-            self?.currentSelectedDisplayUUIDs() ?? []
+        sb.selectedUUIDsProvider = { [weak self] in self?.currentSelectedDisplayUUIDs() ?? [] }
+
+        // Displays Virtuais
+        sb.virtualItemsProvider = {
+            VirtualDisplayManager.shared.listForMenu().map {
+                StatusBarController.VirtualItem(id: $0.id, title: $0.title, sizeText: $0.size, enabled: $0.enabled)
+            }
         }
+        sb.onToggleVirtualItem = { [weak self] configID, enable in
+            guard let self else { return }
+            if !enable {
+                if let uuid = VirtualDisplayManager.shared.uuidString(for: configID) {
+                    var cur = self.currentSelectedDisplayUUIDs()
+                    cur.remove(uuid)
+                    UserDefaults.standard.set(Array(cur), forKey: self.kSelectedDisplayUUIDs)
+                    MultiDisplayNDIManager.shared.setSelectedDisplays(cur)
+                }
+                _ = VirtualDisplayManager.shared.setEnabled(configID: configID, enabled: false)
+                self.statusBar?.refresh()
+                return
+            }
+            if let did = VirtualDisplayManager.shared.setEnabled(configID: configID, enabled: true) {
+                if let cf = CGDisplayCreateUUIDFromDisplayID(did)?.takeRetainedValue() {
+                    let uuid = CFUUIDCreateString(nil, cf) as String
+                    var cur = self.currentSelectedDisplayUUIDs()
+                    cur.insert(uuid)
+                    UserDefaults.standard.set(Array(cur), forKey: self.kSelectedDisplayUUIDs)
+                    MultiDisplayNDIManager.shared.setSelectedDisplays(cur)
+                }
+            }
+            self.statusBar?.refresh()
+        }
+        sb.onAddVirtualPreset = { [weak self] w, h in
+            guard let self else { return }
+            let id = VirtualDisplayManager.shared.addVirtual(width: w, height: h, name: "Virtual \(w)x\(h)", enabled: true)
+            if let did = VirtualDisplayManager.shared.cgDisplayID(for: id),
+               let cf = CGDisplayCreateUUIDFromDisplayID(did)?.takeRetainedValue()
+            {
+                let uuid = CFUUIDCreateString(nil, cf) as String
+                var cur = self.currentSelectedDisplayUUIDs()
+                cur.insert(uuid)
+                UserDefaults.standard.set(Array(cur), forKey: self.kSelectedDisplayUUIDs)
+                MultiDisplayNDIManager.shared.setSelectedDisplays(cur)
+            }
+            self.statusBar?.refresh()
+        }
+        sb.onAddVirtualCustom = { [weak self] in
+            self?.promptAddCustomVirtual()
+        }
+
         statusBar = sb
+    }
+
+    // Caixa de diálogo simples para width/height customizados
+    private func promptAddCustomVirtual() {
+        let alert = NSAlert()
+        alert.messageText = "Novo Display Virtual"
+        alert.informativeText = "Defina a resolução desejada (em pixels)."
+        alert.addButton(withTitle: "Criar")
+        alert.addButton(withTitle: "Cancelar")
+
+        let widthField = NSTextField(string: "1920")
+        widthField.placeholderString = "Largura"
+        widthField.alignment = .right
+        widthField.frame = NSRect(x: 0, y: 28, width: 120, height: 24)
+
+        let xLabel = NSTextField(labelWithString: "×")
+        xLabel.frame = NSRect(x: 124, y: 28, width: 14, height: 24)
+        xLabel.alignment = .center
+
+        let heightField = NSTextField(string: "1080")
+        heightField.placeholderString = "Altura"
+        heightField.alignment = .right
+        heightField.frame = NSRect(x: 140, y: 28, width: 120, height: 24)
+
+        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 60))
+        accessory.addSubview(widthField)
+        accessory.addSubview(xLabel)
+        accessory.addSubview(heightField)
+        alert.accessoryView = accessory
+
+        let resp = alert.runModal()
+        guard resp == .alertFirstButtonReturn else { return }
+
+        let w = Int(widthField.stringValue) ?? 0
+        let h = Int(heightField.stringValue) ?? 0
+        guard w > 0, h > 0 else { return }
+
+        let id = VirtualDisplayManager.shared.addVirtual(width: w, height: h, name: "Virtual \(w)x\(h)", enabled: true)
+
+        if let did = VirtualDisplayManager.shared.cgDisplayID(for: id),
+           let cf = CGDisplayCreateUUIDFromDisplayID(did)?.takeRetainedValue()
+        {
+            let uuid = CFUUIDCreateString(nil, cf) as String
+            var cur = currentSelectedDisplayUUIDs()
+            cur.insert(uuid)
+            UserDefaults.standard.set(Array(cur), forKey: kSelectedDisplayUUIDs)
+            MultiDisplayNDIManager.shared.setSelectedDisplays(cur)
+        }
+        statusBar?.refresh()
     }
 
     private func currentSelectedDisplayUUIDs() -> Set<String> {
@@ -130,52 +224,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         return []
     }
-
-    private func loadOrCreateDefaultSelectedDisplayUUIDs() -> Set<String> {
-        let existing = currentSelectedDisplayUUIDs()
-        if !existing.isEmpty { return existing }
-        let def = defaultDisplayUUIDs()
-        UserDefaults.standard.set(Array(def), forKey: kSelectedDisplayUUIDs)
-        return def
-    }
-
-    private func defaultDisplayUUIDs() -> Set<String> {
-        // Tenta achar a tela virtual criada pelo app:
-        // usamos vendorID/productID definidos no ScreenViewController (0x3456/0x1234).
-        let targetVendor: UInt32 = 0x3456
-        let targetProd: UInt32 = 0x1234
-
-        var max = UInt32(16)
-        var active = [CGDirectDisplayID](repeating: 0, count: Int(max))
-        var count: UInt32 = 0
-        _ = CGGetActiveDisplayList(max, &active, &count)
-        let list = Array(active.prefix(Int(count)))
-
-        var preferred: CGDirectDisplayID?
-
-        for id in list {
-            let vendor = CGDisplayVendorNumber(id)
-            let model = CGDisplayModelNumber(id)
-            if vendor == targetVendor, model == targetProd {
-                preferred = id
-                break
-            }
-        }
-
-        let chosenID = preferred ?? NSScreen.main.flatMap {
-            ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber).map { CGDirectDisplayID($0.uint32Value) }
-        }
-
-        if let id = chosenID,
-           let cf = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue()
-        {
-            let uuid = CFUUIDCreateString(nil, cf) as String
-            return [uuid]
-        }
-        return []
-    }
-
-    // MARK: - Resolução
 
     @objc func openCustomResolutionWindow() {
         let controller = CustomResolutionWindowController()
@@ -191,29 +239,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applyPixelPerfectResolution(width: Int, height: Int) {
         guard width > 0, height > 0 else { return }
-        guard let screen = window.screen ?? NSScreen.main else {
-            print("No screen available to determine backingScaleFactor.")
-            return
-        }
-
+        guard let screen = window.screen ?? NSScreen.main else { return }
         let backingScale = screen.backingScaleFactor
         let scaledWidth = CGFloat(width) / backingScale
         let scaledHeight = CGFloat(height) / backingScale
         let newOrigin = window.frame.origin
         let frame = NSRect(origin: newOrigin, size: CGSize(width: scaledWidth, height: scaledHeight))
-
         window.setFrame(frame, display: true, animate: true)
         window.center()
-
-        print("Requested size: \(width)x\(height)")
-        print("Backing scale factor: \(backingScale)")
-        print("Applied frame: \(window.frame)")
     }
 
     func applicationWillTerminate(_: Notification) {
         MultiDisplayNDIManager.shared.stopAll()
-        if ndiInitialized {
-            NDIlib_destroy()
-        }
+        if ndiInitialized { NDIlib_destroy() }
     }
 }
