@@ -3,8 +3,8 @@ import CoreVideo
 
 final class VirtualPreviewWindowController: NSWindowController {
     private let displayID: CGDirectDisplayID
-    private let pixelWidth: Int
-    private let pixelHeight: Int
+    private var pixelWidth: Int
+    private var pixelHeight: Int
 
     private var stream: CGDisplayStream?
     private let contentView = NSView(frame: .zero)
@@ -14,7 +14,6 @@ final class VirtualPreviewWindowController: NSWindowController {
         self.pixelWidth = pixelWidth
         self.pixelHeight = pixelHeight
 
-        // Converte pixels -> points com base no scale da tela principal
         let scale = NSScreen.main?.backingScaleFactor ?? 2.0
         let sizePoints = NSSize(width: CGFloat(pixelWidth) / scale, height: CGFloat(pixelHeight) / scale)
 
@@ -25,12 +24,17 @@ final class VirtualPreviewWindowController: NSWindowController {
             defer: false
         )
         win.title = title
+        win.contentAspectRatio = sizePoints // mantém proporção
         win.center()
 
         super.init(window: win)
         window?.contentView = contentView
         contentView.wantsLayer = true
-        contentView.layer?.backgroundColor = NSColor.black.cgColor
+        if let layer = contentView.layer {
+            layer.backgroundColor = NSColor.black.cgColor
+            layer.contentsScale = 1.0
+            layer.rasterizationScale = 1.0
+        }
     }
 
     @available(*, unavailable)
@@ -57,6 +61,26 @@ final class VirtualPreviewWindowController: NSWindowController {
     func stop() {
         stream?.stop()
         stream = nil
+    }
+
+    func resize(toPixelWidth w: Int, height h: Int) {
+        pixelWidth = w
+        pixelHeight = h
+        stop()
+
+        let scale = window?.screen?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2.0
+        let sizePoints = NSSize(width: CGFloat(w) / scale, height: CGFloat(h) / scale)
+
+        if let win = window {
+            win.setContentSize(sizePoints)
+            win.contentAspectRatio = sizePoints
+            win.center()
+        }
+        start()
+    }
+
+    func setTitle(_ title: String) {
+        window?.title = title
     }
 
     deinit { stop() }

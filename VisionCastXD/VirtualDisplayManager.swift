@@ -13,14 +13,14 @@ final class VirtualDisplayManager {
     }
 
     struct VDisplay {
-        let config: Config
+        var config: Config
         let display: CGVirtualDisplay
     }
 
     private let kStorageKey = "virtualDisplays.configs"
     private(set) var configs: [Config] = []
     private var displaysByID: [String: VDisplay] = [:]
-    private var previewsByID: [String: VirtualPreviewWindowController] = [:] // <- novo
+    private var previewsByID: [String: VirtualPreviewWindowController] = [:]
     private var nextSerial: UInt32 = 0x0100
 
     func load() {
@@ -93,8 +93,7 @@ final class VirtualDisplayManager {
 
         if enabled {
             if displaysByID[configID] == nil {
-                let did = createDisplay(from: configs[idx])
-                return did
+                return createDisplay(from: configs[idx])
             }
             return displaysByID[configID]?.display.displayID
         } else {
@@ -110,17 +109,50 @@ final class VirtualDisplayManager {
     }
 
     func destroy(configID: String) {
-        // fecha preview primeiro
         closePreview(for: configID)
-        // remove display runtime
-        guard let vd = displaysByID.removeValue(forKey: configID) else { return }
-        print("VDM: destruído \(vd.display.displayID) [\(configID)]")
+        _ = displaysByID.removeValue(forKey: configID)
     }
 
     func removeConfig(configID: String) {
         destroy(configID: configID)
         configs.removeAll { $0.id == configID }
         save()
+    }
+
+    // Renomeia (atualiza config e título do preview)
+    func rename(configID: String, to newName: String) {
+        guard let idx = configs.firstIndex(where: { $0.id == configID }) else { return }
+        configs[idx].name = newName
+        save()
+
+        // Atualiza título do preview se existir
+        previewsByID[configID]?.setTitle(newName)
+
+        // Atualiza também o name do runtime (não há API pública para renomear CGVirtualDisplay;
+        // o nome do display mostrado no sistema fica como no descriptor inicial)
+        // Usamos o título da janela/preview como referência visível para o usuário.
+    }
+
+    // Muda resolução; se estiver habilitado, aplica no display e no preview
+    func updateResolution(configID: String, width: Int, height: Int) {
+        guard let idx = configs.firstIndex(where: { $0.id == configID }) else { return }
+        configs[idx].width = width
+        configs[idx].height = height
+        save()
+
+        if var vd = displaysByID[configID] {
+            let settings = CGVirtualDisplaySettings()
+            settings.hiDPI = 0
+            settings.modes = [CGVirtualDisplayMode(width: UInt(width), height: UInt(height), refreshRate: 60)]
+            if vd.display.apply(settings) {
+                vd.config.width = width
+                vd.config.height = height
+                displaysByID[configID] = vd
+                previewsByID[configID]?.resize(toPixelWidth: width, height: height)
+            } else {
+                print("VDM: falha ao aplicar novo modo \(width)x\(height) em \(vd.display.displayID)")
+            }
+        }
     }
 
     // MARK: Interno
@@ -160,10 +192,7 @@ final class VirtualDisplayManager {
 
         displaysByID[cfg.id] = VDisplay(config: cfg, display: display)
 
-        // Abre preview automaticamente
         openPreview(for: cfg.id, title: cfg.name, width: cfg.width, height: cfg.height)
-
-        print("VDM: criado \(display.displayID) \(cfg.width)x\(cfg.height) [\(cfg.id)]")
         return display.displayID
     }
 

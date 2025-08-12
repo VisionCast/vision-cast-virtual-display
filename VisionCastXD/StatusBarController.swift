@@ -2,12 +2,10 @@ import AppKit
 import CoreGraphics
 
 final class StatusBarController: NSObject {
-    var onPickResolution: ((Int, Int) -> Void)?
-    var onOpenCustomResolution: (() -> Void)?
+    // Removidos: onPickResolution, onOpenCustomResolution
     var onToggleDisplay: ((CGDirectDisplayID, Bool) -> Void)?
     var selectedUUIDsProvider: (() -> Set<String>)?
 
-    // NOVO: gerenciamento de virtuais
     struct VirtualItem {
         let id: String
         let title: String
@@ -18,7 +16,11 @@ final class StatusBarController: NSObject {
     var virtualItemsProvider: (() -> [VirtualItem])?
     var onToggleVirtualItem: ((String, Bool) -> Void)?
     var onAddVirtualPreset: ((Int, Int) -> Void)?
-    var onAddVirtualCustom: (() -> Void)? // <- novo
+    var onAddVirtualCustom: (() -> Void)?
+    var onRenameVirtual: ((String) -> Void)?
+    var onEditVirtualPreset: ((String, Int, Int) -> Void)?
+    var onEditVirtualCustom: ((String) -> Void)?
+    var onRemoveVirtual: ((String) -> Void)?
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
@@ -46,14 +48,12 @@ final class StatusBarController: NSObject {
 
     func refresh() { rebuildMenu() }
 
-    @objc private func rebuildMenu() {
-        statusItem.menu = buildMenu()
-    }
+    @objc private func rebuildMenu() { statusItem.menu = buildMenu() }
 
     private func buildMenu() -> NSMenu {
         let menu = NSMenu()
 
-        // Displays Virtuais
+        // Displays Virtuais (cada um com submenu)
         let vTitle = NSMenuItem()
         vTitle.title = "Displays Virtuais"
         vTitle.isEnabled = false
@@ -67,11 +67,48 @@ final class StatusBarController: NSObject {
             menu.addItem(empty)
         } else {
             for it in vItems {
-                let item = NSMenuItem(title: "\(it.title) (\(it.sizeText))", action: #selector(toggleVirtual(_:)), keyEquivalent: "")
-                item.target = self
-                item.state = it.enabled ? .on : .off
-                item.representedObject = it.id
-                menu.addItem(item)
+                let parent = NSMenuItem(title: "\(it.title) (\(it.sizeText))", action: nil, keyEquivalent: "")
+                let sub = NSMenu(title: it.title)
+
+                // Ativar/Desativar
+                let toggle = NSMenuItem(title: it.enabled ? "Desativar" : "Ativar",
+                                        action: #selector(toggleVirtual(_:)), keyEquivalent: "")
+                toggle.target = self
+                toggle.representedObject = it.id
+                sub.addItem(toggle)
+
+                // Renomear
+                let rename = NSMenuItem(title: "Renomear…", action: #selector(renameVirtual(_:)), keyEquivalent: "")
+                rename.target = self
+                rename.representedObject = it.id
+                sub.addItem(rename)
+
+                // Mudar Resolução (presets + custom)
+                let resSub = NSMenu(title: "Mudar Resolução")
+                for r in resolutions {
+                    let item = NSMenuItem(title: r.label, action: #selector(editVirtualPreset(_:)), keyEquivalent: "")
+                    item.target = self
+                    item.representedObject = ["id": it.id, "w": r.w, "h": r.h]
+                    resSub.addItem(item)
+                }
+                resSub.addItem(.separator())
+                let resCustom = NSMenuItem(title: "Personalizar…", action: #selector(editVirtualCustom(_:)), keyEquivalent: "")
+                resCustom.target = self
+                resCustom.representedObject = it.id
+                resSub.addItem(resCustom)
+
+                let resRoot = NSMenuItem(title: "Mudar Resolução", action: nil, keyEquivalent: "")
+                resRoot.submenu = resSub
+                sub.addItem(resRoot)
+
+                // Remover
+                let remove = NSMenuItem(title: "Remover", action: #selector(removeVirtual(_:)), keyEquivalent: "")
+                remove.target = self
+                remove.representedObject = it.id
+                sub.addItem(remove)
+
+                parent.submenu = sub
+                menu.addItem(parent)
             }
         }
 
@@ -94,25 +131,7 @@ final class StatusBarController: NSObject {
 
         menu.addItem(.separator())
 
-        // Resolução da janela/preview
-        let titleRes = NSMenuItem()
-        titleRes.title = "Resolução"
-        titleRes.isEnabled = false
-        menu.addItem(titleRes)
-
-        for r in resolutions {
-            let item = NSMenuItem(title: r.label, action: #selector(didPickResolution(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = ["w": r.w, "h": r.h]
-            menu.addItem(item)
-        }
-        let customize = NSMenuItem(title: "Personalizar…", action: #selector(openCustomResolution), keyEquivalent: "")
-        customize.target = self
-        menu.addItem(customize)
-
-        menu.addItem(.separator())
-
-        // NDI • Telas compartilhadas
+        // NDI
         let titleNDI = NSMenuItem()
         titleNDI.title = "NDI • Telas compartilhadas"
         titleNDI.isEnabled = false
@@ -133,30 +152,43 @@ final class StatusBarController: NSObject {
         quit.keyEquivalentModifierMask = [.command]
         quit.target = self
         menu.addItem(quit)
-
         return menu
     }
 
-    @objc private func didPickResolution(_ sender: NSMenuItem) {
-        guard let dict = sender.representedObject as? [String: Int],
-              let w = dict["w"], let h = dict["h"] else { return }
-        onPickResolution?(w, h)
-    }
-
-    @objc private func openCustomResolution() { onOpenCustomResolution?() }
+    // Callbacks (sem seção de resolução global)
 
     @objc private func toggleDisplayNDI(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? CGDirectDisplayID else { return }
-        let newState: NSControl.StateValue = (sender.state == .on) ? .off : .on
-        sender.state = newState
-        onToggleDisplay?(id, newState == .on)
+        let isOn = !(selectedUUIDsProvider?().contains(Self.uuidString(for: id) ?? "") ?? false)
+        onToggleDisplay?(id, isOn)
     }
 
     @objc private func toggleVirtual(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
-        let newState: NSControl.StateValue = (sender.state == .on) ? .off : .on
-        sender.state = newState
-        onToggleVirtualItem?(id, newState == .on)
+        onToggleVirtualItem?(id, true)
+    }
+
+    @objc private func renameVirtual(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        onRenameVirtual?(id)
+    }
+
+    @objc private func editVirtualPreset(_ sender: NSMenuItem) {
+        guard let dict = sender.representedObject as? [String: Any],
+              let id = dict["id"] as? String,
+              let w = dict["w"] as? Int,
+              let h = dict["h"] as? Int else { return }
+        onEditVirtualPreset?(id, w, h)
+    }
+
+    @objc private func editVirtualCustom(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        onEditVirtualCustom?(id)
+    }
+
+    @objc private func removeVirtual(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        onRemoveVirtual?(id)
     }
 
     @objc private func addVirtualPreset(_ sender: NSMenuItem) {
@@ -165,13 +197,16 @@ final class StatusBarController: NSObject {
         onAddVirtualPreset?(w, h)
     }
 
-    @objc private func addVirtualCustom() {
-        onAddVirtualCustom?()
-    }
+    @objc private func addVirtualCustom() { onAddVirtualCustom?() }
 
     @objc private func quitApp() { NSApp.terminate(nil) }
 
-    // Utilidades (inalterado)
+    // Utils
+    private static func uuidString(for displayID: CGDirectDisplayID) -> String? {
+        guard let cf = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue() else { return nil }
+        return CFUUIDCreateString(nil, cf) as String
+    }
+
     struct DisplayInfo {
         let id: CGDirectDisplayID
         let uuidString: String
