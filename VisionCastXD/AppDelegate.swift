@@ -45,6 +45,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         VirtualDisplayManager.shared.createAllEnabled()
         setupStatusBar()
 
+        statusBar?.refresh()
+
         NotificationCenter.default.addObserver(self,
                                                selector: #selector(handleStatusBarRefresh),
                                                name: Notification.Name("StatusBarRefreshRequest"),
