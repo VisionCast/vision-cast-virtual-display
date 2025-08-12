@@ -6,29 +6,30 @@ enum AppDelegateAction: Action {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-    // Janela principal removida (não abrimos preview default)
     var window: NSWindow!
     private var ndiInitialized = false
     private var statusBar: StatusBarController?
 
-    private let kCustomWidth = "customWidth"
-    private let kCustomHeight = "customHeight"
+    private var refreshWorkItem: DispatchWorkItem?
+    private let refreshDebounce: TimeInterval = 0.3
+
     private let kSelectedDisplayUUIDs = "selectedDisplayUUIDs"
 
     func applicationDidFinishLaunching(_: Notification) {
-        if NDIlib_initialize() {
-            ndiInitialized = true
-        } else {
-            print("Falha ao inicializar NDI")
-        }
+        // Defaults (30 fps por padrão, preview half-res desligado)
+        UserDefaults.standard.register(defaults: [
+            "preferredFPS": 30,
+            "previewHalfRes": false,
+        ])
+
+        if NDIlib_initialize() { ndiInitialized = true } else { print("Falha ao inicializar NDI") }
 
         VirtualDisplayManager.shared.load()
 
-        // Se não existir nenhuma tela, pede para criar a primeira (nome + resolução)
+        // Criar primeira tela (mantido se desejar)
         if VirtualDisplayManager.shared.listForMenu().isEmpty {
             if let (name, w, h) = promptCreateFirstVirtual() {
                 let id = VirtualDisplayManager.shared.addVirtual(width: w, height: h, name: name, enabled: true)
-                // Inclui no NDI já na inicialização
                 if let did = VirtualDisplayManager.shared.cgDisplayID(for: id),
                    let cf = CGDisplayCreateUUIDFromDisplayID(did)?.takeRetainedValue()
                 {
@@ -41,26 +42,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // Cria todos os virtuais habilitados (e abre seus previews)
         VirtualDisplayManager.shared.createAllEnabled()
-
         setupStatusBar()
 
-        // Observa pedidos de refresh do Status Bar (ex.: ao fechar preview)
         NotificationCenter.default.addObserver(self,
                                                selector: #selector(handleStatusBarRefresh),
                                                name: Notification.Name("StatusBarRefreshRequest"),
                                                object: nil)
 
-        // Seleção NDI inicial
         var selected = currentSelectedDisplayUUIDs()
         selected.formUnion(VirtualDisplayManager.shared.currentVirtualUUIDs())
         UserDefaults.standard.set(Array(selected), forKey: kSelectedDisplayUUIDs)
         MultiDisplayNDIManager.shared.setSelectedDisplays(selected)
-        if ndiInitialized {
-            MultiDisplayNDIManager.shared.start()
-        }
+        if ndiInitialized { MultiDisplayNDIManager.shared.start() }
 
+        // Menu app
         let mainMenu = NSMenu()
         let mainMenuItem = NSMenuItem()
         let subMenu = NSMenu(title: "MainMenu")
@@ -73,15 +69,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         store.dispatch(AppDelegateAction.didFinishLaunching)
     }
 
-    @objc private func handleStatusBarRefresh() {
-        statusBar?.refresh()
+    @objc private func handleStatusBarRefresh() { requestStatusBarRefresh() }
+
+    private func requestStatusBarRefresh() {
+        refreshWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.statusBar?.refresh() }
+        refreshWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + refreshDebounce, execute: work)
     }
 
     private func currentSelectedDisplayUUIDs() -> Set<String> {
         let defaults = UserDefaults.standard
-        if let arr = defaults.array(forKey: kSelectedDisplayUUIDs) as? [String] {
-            return Set(arr)
-        }
+        if let arr = defaults.array(forKey: kSelectedDisplayUUIDs) as? [String] { return Set(arr) }
         return []
     }
 
@@ -93,18 +92,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             guard let cf = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue() else { return }
             let uuid = CFUUIDCreateString(nil, cf) as String
-
             var current = self.currentSelectedDisplayUUIDs()
             if isOn { current.insert(uuid) } else { current.remove(uuid) }
             UserDefaults.standard.set(Array(current), forKey: self.kSelectedDisplayUUIDs)
             MultiDisplayNDIManager.shared.setSelectedDisplays(current)
-
-            self.statusBar?.refresh()
+            self.requestStatusBarRefresh()
         }
 
-        sb.selectedUUIDsProvider = { [weak self] in
-            self?.currentSelectedDisplayUUIDs() ?? []
-        }
+        sb.selectedUUIDsProvider = { [weak self] in self?.currentSelectedDisplayUUIDs() ?? [] }
 
         // Displays Virtuais
         sb.virtualItemsProvider = {
@@ -134,7 +129,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     MultiDisplayNDIManager.shared.setSelectedDisplays(cur)
                 }
             }
-            self.statusBar?.refresh()
+            self.requestStatusBarRefresh()
         }
         sb.onAddVirtualPreset = { [weak self] w, h in
             guard let self else { return }
@@ -148,21 +143,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 UserDefaults.standard.set(Array(cur), forKey: self.kSelectedDisplayUUIDs)
                 MultiDisplayNDIManager.shared.setSelectedDisplays(cur)
             }
-            self.statusBar?.refresh()
+            self.requestStatusBarRefresh()
         }
-        sb.onAddVirtualCustom = { [weak self] in
-            self?.promptAddCustomVirtual()
-        }
-        sb.onRenameVirtual = { [weak self] id in
-            self?.promptRenameVirtual(id: id)
-        }
+        sb.onAddVirtualCustom = { [weak self] in self?.promptAddCustomVirtual() }
+        sb.onRenameVirtual = { [weak self] id in self?.promptRenameVirtual(id: id) }
         sb.onEditVirtualPreset = { [weak self] id, w, h in
             VirtualDisplayManager.shared.updateResolution(configID: id, width: w, height: h)
-            self?.statusBar?.refresh()
+            self?.requestStatusBarRefresh()
         }
-        sb.onEditVirtualCustom = { [weak self] id in
-            self?.promptEditResolutionVirtual(id: id)
-        }
+        sb.onEditVirtualCustom = { [weak self] id in self?.promptEditResolutionVirtual(id: id) }
         sb.onRemoveVirtual = { [weak self] id in
             guard let self else { return }
             if let uuid = VirtualDisplayManager.shared.uuidString(for: id) {
@@ -172,21 +161,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 MultiDisplayNDIManager.shared.setSelectedDisplays(cur)
             }
             VirtualDisplayManager.shared.removeConfig(configID: id)
-            self.statusBar?.refresh()
+            self.requestStatusBarRefresh()
+        }
+
+        // Preferências (FPS e Half-res)
+        sb.onSetFPS = { [weak self] fps in
+            guard let self else { return }
+            Preferences.setPreferredFPS(fps)
+            // Reinicia pipelines do NDI com novo FPS
+            let current = MultiDisplayNDIManager.shared.selectedDisplayUUIDs
+            MultiDisplayNDIManager.shared.stopAll()
+            MultiDisplayNDIManager.shared.setSelectedDisplays(current)
+            MultiDisplayNDIManager.shared.start()
+            // Reinicia previews (FPS aplicado no start)
+            VirtualDisplayManager.shared.refreshPreviewsForPreferencesChange()
+            self.requestStatusBarRefresh()
+        }
+        sb.onToggleHalfRes = { [weak self] isOn in
+            guard let self else { return }
+            Preferences.setPreviewHalfRes(isOn)
+            // Recria previews com novo tamanho em pontos
+            VirtualDisplayManager.shared.refreshPreviewsForPreferencesChange()
+            self.requestStatusBarRefresh()
         }
 
         statusBar = sb
     }
 
-    // MARK: - Dialogs utilitários
+    // MARK: - Dialogs utilitários (os existentes + criar primeira tela)
 
     private func promptAddCustomVirtual() {
         let (w, h) = promptResolution(defaultW: 1920, defaultH: 1080) ?? (0, 0)
         guard w > 0, h > 0 else { return }
-
-        // Pede nome também
         guard let name = promptName(defaultName: "Virtual \(w)x\(h)") else { return }
-
         let id = VirtualDisplayManager.shared.addVirtual(width: w, height: h, name: name, enabled: true)
         if let did = VirtualDisplayManager.shared.cgDisplayID(for: id),
            let cf = CGDisplayCreateUUIDFromDisplayID(did)?.takeRetainedValue()
@@ -197,17 +204,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             UserDefaults.standard.set(Array(cur), forKey: kSelectedDisplayUUIDs)
             MultiDisplayNDIManager.shared.setSelectedDisplays(cur)
         }
-        statusBar?.refresh()
+        requestStatusBarRefresh()
     }
 
-    private func promptRenameVirtual(id: String) {
-        if let name = promptName(defaultName: "") {
-            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return }
-            VirtualDisplayManager.shared.rename(configID: id, to: trimmed)
-            statusBar?.refresh()
+    // Compatibilidade: chamado pelo CustomResolutionViewController
+    // Lê a resolução salva (customWidth/customHeight) e aplica na primeira tela virtual habilitada.
+    func applyStoredResolution() {
+        let defaults = UserDefaults.standard
+        let w = defaults.integer(forKey: "customWidth")
+        let h = defaults.integer(forKey: "customHeight")
+        guard w > 0, h > 0 else {
+            return
+        }
+
+        // Aplica na primeira tela virtual habilitada (se existir)
+        if let firstEnabled = VirtualDisplayManager.shared.listForMenu().first(where: { $0.enabled })?.id {
+            VirtualDisplayManager.shared.updateResolution(configID: firstEnabled, width: w, height: h)
+            // Atualiza menus/estado
+            NotificationCenter.default.post(name: Notification.Name("StatusBarRefreshRequest"), object: nil)
         }
     }
+
+    // ... dentro da classe AppDelegate ...
+
+    // MARK: - Dialogs utilitários
 
     // Formatter que aceita apenas dígitos e mostra um aviso no próprio diálogo
     private final class DigitsOnlyFormatter: NumberFormatter {
@@ -240,14 +260,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func promptEditResolutionVirtual(id: String) {
-        let (w, h) = promptResolution(defaultW: 1920, defaultH: 1080) ?? (0, 0)
-        guard w > 0, h > 0 else { return }
-        VirtualDisplayManager.shared.updateResolution(configID: id, width: w, height: h)
-        statusBar?.refresh()
-    }
-
-    // Aceita apenas números; mostra aviso ao tentar caractere inválido e valida ao confirmar
+    // Pede resolução (somente números). Retorna nil se cancelar.
     private func promptResolution(defaultW: Int, defaultH: Int) -> (Int, Int)? {
         while true {
             let alert = NSAlert()
@@ -305,7 +318,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // Pede um nome (padrão preenchido), retorna nil se cancelar
+    // Pede um nome (padrão preenchido). Retorna nil se cancelar.
     private func promptName(defaultName: String) -> String? {
         let alert = NSAlert()
         alert.messageText = "Nome do Display"
@@ -319,7 +332,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let resp = alert.runModal()
         guard resp == .alertFirstButtonReturn else { return nil }
-        return tf.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return tf.stringValue.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
     }
 
     // Modal para criar a primeira tela (nome + resolução com validação numérica)
@@ -373,7 +386,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let resp = alert.runModal()
             guard resp == .alertFirstButtonReturn else { return nil }
 
-            let name = nameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            let name = nameField.stringValue.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
             let w = (widthField.stringValue as NSString).integerValue
             let h = (heightField.stringValue as NSString).integerValue
             if !name.isEmpty, w > 0, h > 0 {
@@ -388,20 +401,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // Compatibilidade (caso algum fluxo legado chame)
-    func applyStoredResolution() {
-        let defaults = UserDefaults.standard
-        let w = defaults.integer(forKey: kCustomWidth)
-        let h = defaults.integer(forKey: kCustomHeight)
+    // Editar resolução de uma tela existente
+    private func promptEditResolutionVirtual(id: String) {
+        let (w, h) = promptResolution(defaultW: 1920, defaultH: 1080) ?? (0, 0)
         guard w > 0, h > 0 else { return }
-        // Sem janela principal padrão para redimensionar. Mantido para compatibilidade.
+        VirtualDisplayManager.shared.updateResolution(configID: id, width: w, height: h)
+        // Atualiza menu
+        NotificationCenter.default.post(name: Notification.Name("StatusBarRefreshRequest"), object: nil)
     }
+
+    private func promptRenameVirtual(id: String) {
+        if let name = promptName(defaultName: "") {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+            VirtualDisplayManager.shared.rename(configID: id, to: trimmed)
+            requestStatusBarRefresh()
+        }
+    }
+
+    // promptResolution / promptName / promptCreateFirstVirtual seguem iguais aos já adicionados
 
     func applicationWillTerminate(_: Notification) {
         NotificationCenter.default.removeObserver(self, name: Notification.Name("StatusBarRefreshRequest"), object: nil)
         MultiDisplayNDIManager.shared.stopAll()
-        if ndiInitialized {
-            NDIlib_destroy()
-        }
+        if ndiInitialized { NDIlib_destroy() }
     }
 }

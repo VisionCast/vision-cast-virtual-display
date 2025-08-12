@@ -11,8 +11,7 @@ class ScreenViewController: SubscriberViewController<ScreenViewData>, NSWindowDe
     private let streamQueue = DispatchQueue(label: "screen.preview.stream", qos: .userInitiated)
 
     private var isWindowHighlighted = false
-    private var previousResolution: CGSize?
-    private var previousScaleFactor: CGFloat?
+    private var lastSizePoints: NSSize?
 
     private var boundConfigID: String?
     private var boundDisplayID: CGDirectDisplayID?
@@ -64,25 +63,32 @@ class ScreenViewController: SubscriberViewController<ScreenViewData>, NSWindowDe
     private func restartPreviewResizingWindow(displayID: CGDirectDisplayID? = nil) {
         stream?.stop()
         stream = nil
-
         guard let window = view.window else { return }
 
         let scale = window.screen?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2.0
-        let sizePoints = NSSize(width: CGFloat(pixelWidth) / scale, height: CGFloat(pixelHeight) / scale)
+        let factor = Preferences.previewHalfRes ? 0.5 : 1.0
+        let sizePoints = NSSize(width: CGFloat(pixelWidth) * factor / scale, height: CGFloat(pixelHeight) * factor / scale)
         window.setContentSize(sizePoints)
         window.contentAspectRatio = sizePoints
-        window.center()
+        if lastSizePoints != sizePoints {
+            window.center()
+            lastSizePoints = sizePoints
+        }
 
         guard let did = displayID ?? boundDisplayID else { return }
+        let fps = Preferences.preferredFPS
         let props: CFDictionary = [
             CGDisplayStream.showCursor: true,
-            CGDisplayStream.minimumFrameTime: NSNumber(value: 1.0 / 60.0),
+            CGDisplayStream.minimumFrameTime: NSNumber(value: 1.0 / Double(fps)),
         ] as CFDictionary
+
+        let outW = max(1, Int(Double(pixelWidth) * factor))
+        let outH = max(1, Int(Double(pixelHeight) * factor))
 
         stream = CGDisplayStream(
             dispatchQueueDisplay: did,
-            outputWidth: pixelWidth,
-            outputHeight: pixelHeight,
+            outputWidth: outW,
+            outputHeight: outH,
             pixelFormat: Int32(kCVPixelFormatType_32BGRA),
             properties: props,
             queue: streamQueue
@@ -108,13 +114,8 @@ class ScreenViewController: SubscriberViewController<ScreenViewData>, NSWindowDe
     }
 
     func windowWillResize(_ window: NSWindow, to frameSize: NSSize) -> NSSize {
-        let snappingOffset: CGFloat = 30
+        // Mantido se precisar de snap ao mudar manualmente
         let contentSize = window.contentRect(forFrameRect: NSRect(origin: .zero, size: frameSize)).size
-        guard let screenResolution = previousResolution,
-              abs(contentSize.width - screenResolution.width) < snappingOffset
-        else {
-            return frameSize
-        }
-        return window.frameRect(forContentRect: NSRect(origin: .zero, size: screenResolution)).size
+        return window.frameRect(forContentRect: NSRect(origin: .zero, size: contentSize)).size
     }
 }

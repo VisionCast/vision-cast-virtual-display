@@ -102,6 +102,14 @@ final class VirtualDisplayManager {
         }
     }
 
+    func refreshPreviewsForPreferencesChange() {
+        for (configID, vd) in displaysByID {
+            let w = vd.config.width
+            let h = vd.config.height
+            previewsByID[configID]?.resize(toPixelWidth: w, height: h)
+        }
+    }
+
     func createAllEnabled() {
         for cfg in configs where cfg.enabled {
             _ = createDisplay(from: cfg)

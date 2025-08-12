@@ -20,18 +20,11 @@ final class MultiDisplayNDIManager {
         let buffer: UnsafeMutablePointer<UInt8>
         let rowBytes: Int
         let queue: DispatchQueue
-
         init(sender: NDISender, stream: CGDisplayStream, buffer: UnsafeMutablePointer<UInt8>, rowBytes: Int, queue: DispatchQueue) {
-            self.sender = sender
-            self.stream = stream
-            self.buffer = buffer
-            self.rowBytes = rowBytes
-            self.queue = queue
+            self.sender = sender; self.stream = stream; self.buffer = buffer; self.rowBytes = rowBytes; self.queue = queue
         }
 
-        deinit {
-            buffer.deallocate()
-        }
+        deinit { buffer.deallocate() }
     }
 
     private var pipelines: [CGDirectDisplayID: Pipeline] = [:]
@@ -59,26 +52,15 @@ final class MultiDisplayNDIManager {
     func setSelectedDisplays(_ uuids: Set<String>) {
         let old = selectedDisplayUUIDs
         selectedDisplayUUIDs = uuids
-
-        if uuids.isEmpty {
-            stopAll()
-            return
-        }
+        if uuids.isEmpty { stopAll(); return }
 
         let map = currentUUIDToDisplayID()
-
-        let toStop = old.subtracting(uuids)
-        for u in toStop { if let id = map[u] { stopPipeline(for: id) } }
-
-        let toStart = uuids.subtracting(old)
-        for u in toStart { if let id = map[u] { startPipeline(for: id) } }
+        for u in old.subtracting(uuids) { if let id = map[u] { stopPipeline(for: id) } }
+        for u in uuids.subtracting(old) { if let id = map[u] { startPipeline(for: id) } }
     }
 
     func stopAll() {
-        for (_, p) in pipelines {
-            p.stream.stop()
-            p.sender.shutdown()
-        }
+        for (_, p) in pipelines { p.stream.stop(); p.sender.shutdown() }
         pipelines.removeAll()
         if observingDisplayChanges {
             NotificationCenter.default.removeObserver(self, name: NSApplication.didChangeScreenParametersNotification, object: nil)
@@ -95,10 +77,8 @@ final class MultiDisplayNDIManager {
     private func applySelection() {
         let map = currentUUIDToDisplayID()
         let selectedIDs = Set(selectedDisplayUUIDs.compactMap { map[$0] })
-
         let idsToStop = Set(pipelines.keys).subtracting(selectedIDs)
         for id in idsToStop { stopPipeline(for: id) }
-
         let idsToStart = selectedIDs.subtracting(Set(pipelines.keys))
         for id in idsToStart { startPipeline(for: id) }
     }
@@ -108,15 +88,10 @@ final class MultiDisplayNDIManager {
         var active = [CGDirectDisplayID](repeating: 0, count: Int(max))
         var count: UInt32 = 0
         guard CGGetActiveDisplayList(max, &active, &count) == .success else { return [:] }
-        let list = Array(active.prefix(Int(count)))
-
-        var map: [String: CGDirectDisplayID] = [:]
-        for id in list {
-            if let cf = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue() {
-                map[CFUUIDCreateString(nil, cf) as String] = id
-            }
-        }
-        return map
+        return Dictionary(uniqueKeysWithValues: Array(active.prefix(Int(count))).compactMap { id in
+            guard let cf = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue() else { return nil }
+            return (CFUUIDCreateString(nil, cf) as String, id)
+        })
     }
 
     private func displayFriendlyName(for displayID: CGDirectDisplayID) -> String {
@@ -133,7 +108,6 @@ final class MultiDisplayNDIManager {
 
     private func startPipeline(for displayID: CGDirectDisplayID) {
         if pipelines[displayID] != nil { return }
-
         let width = Int(CGDisplayPixelsWide(displayID))
         let height = Int(CGDisplayPixelsHigh(displayID))
         guard width > 0, height > 0 else { return }
@@ -147,9 +121,10 @@ final class MultiDisplayNDIManager {
 
         let queue = DispatchQueue(label: "ndi.stream.\(displayID)", qos: .userInitiated)
 
+        let fps = Preferences.preferredFPS
         let props: CFDictionary = [
             CGDisplayStream.showCursor: true,
-            CGDisplayStream.minimumFrameTime: NSNumber(value: 1.0 / 60.0), // 60 fps cap
+            CGDisplayStream.minimumFrameTime: NSNumber(value: 1.0 / Double(fps)),
         ] as CFDictionary
 
         guard let stream = CGDisplayStream(
@@ -178,8 +153,7 @@ final class MultiDisplayNDIManager {
             return
         }
 
-        let pipe = Pipeline(sender: sender, stream: stream, buffer: buffer, rowBytes: rowBytes, queue: queue)
-        pipelines[displayID] = pipe
+        pipelines[displayID] = Pipeline(sender: sender, stream: stream, buffer: buffer, rowBytes: rowBytes, queue: queue)
         stream.start()
     }
 
@@ -187,7 +161,7 @@ final class MultiDisplayNDIManager {
         guard let p = pipelines.removeValue(forKey: displayID) else { return }
         p.stream.stop()
         p.sender.shutdown()
-        // buffer é desalocado no deinit de Pipeline
+        // buffer desalocado no deinit do Pipeline
     }
 
     @objc private func displaysChanged() {

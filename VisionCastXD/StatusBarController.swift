@@ -2,7 +2,6 @@ import AppKit
 import CoreGraphics
 
 final class StatusBarController: NSObject {
-    // Removidos: onPickResolution, onOpenCustomResolution
     var onToggleDisplay: ((CGDirectDisplayID, Bool) -> Void)?
     var selectedUUIDsProvider: (() -> Set<String>)?
 
@@ -21,6 +20,10 @@ final class StatusBarController: NSObject {
     var onEditVirtualPreset: ((String, Int, Int) -> Void)?
     var onEditVirtualCustom: ((String) -> Void)?
     var onRemoveVirtual: ((String) -> Void)?
+
+    // Preferências
+    var onSetFPS: ((Int) -> Void)?
+    var onToggleHalfRes: ((Bool) -> Void)?
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
@@ -46,14 +49,18 @@ final class StatusBarController: NSObject {
                                                name: NSApplication.didChangeScreenParametersNotification, object: nil)
     }
 
-    func refresh() { rebuildMenu() }
+    func refresh() {
+        rebuildMenu()
+    }
 
-    @objc private func rebuildMenu() { statusItem.menu = buildMenu() }
+    @objc private func rebuildMenu() {
+        statusItem.menu = buildMenu()
+    }
 
     private func buildMenu() -> NSMenu {
         let menu = NSMenu()
 
-        // Displays Virtuais (cada um com submenu)
+        // Displays Virtuais
         let vTitle = NSMenuItem()
         vTitle.title = "Displays Virtuais"
         vTitle.isEnabled = false
@@ -131,6 +138,39 @@ final class StatusBarController: NSObject {
 
         menu.addItem(.separator())
 
+        // Preferências
+        let prefTitle = NSMenuItem()
+        prefTitle.title = "Preferências"
+        prefTitle.isEnabled = false
+        menu.addItem(prefTitle)
+
+        // FPS submenu
+        let fpsSub = NSMenu(title: "FPS")
+        let currentFPS = Preferences.preferredFPS
+        let fps30 = NSMenuItem(title: "30 fps", action: #selector(setFPS(_:)), keyEquivalent: "")
+        fps30.target = self
+        fps30.representedObject = 30
+        fps30.state = (currentFPS == 30) ? .on : .off
+        fpsSub.addItem(fps30)
+
+        let fps60 = NSMenuItem(title: "60 fps", action: #selector(setFPS(_:)), keyEquivalent: "")
+        fps60.target = self
+        fps60.representedObject = 60
+        fps60.state = (currentFPS == 60) ? .on : .off
+        fpsSub.addItem(fps60)
+
+        let fpsRoot = NSMenuItem(title: "FPS", action: nil, keyEquivalent: "")
+        fpsRoot.submenu = fpsSub
+        menu.addItem(fpsRoot)
+
+        // Half-res toggle
+        let halfRes = NSMenuItem(title: "Preview em meia resolução", action: #selector(toggleHalfRes(_:)), keyEquivalent: "")
+        halfRes.target = self
+        halfRes.state = Preferences.previewHalfRes ? .on : .off
+        menu.addItem(halfRes)
+
+        menu.addItem(.separator())
+
         // NDI
         let titleNDI = NSMenuItem()
         titleNDI.title = "NDI • Telas compartilhadas"
@@ -155,23 +195,28 @@ final class StatusBarController: NSObject {
         return menu
     }
 
-    // Callbacks (sem seção de resolução global)
+    // Callbacks
 
     @objc private func toggleDisplayNDI(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? CGDirectDisplayID else { return }
-        // Alterna o estado visual imediatamente
+        guard let id = sender.representedObject as? CGDirectDisplayID else {
+            return
+        }
         let newState: NSControl.StateValue = (sender.state == .on) ? .off : .on
         sender.state = newState
         onToggleDisplay?(id, newState == .on)
     }
 
     @objc private func toggleVirtual(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? String else { return }
+        guard let id = sender.representedObject as? String else {
+            return
+        }
         onToggleVirtualItem?(id, true)
     }
 
     @objc private func renameVirtual(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? String else { return }
+        guard let id = sender.representedObject as? String else {
+            return
+        }
         onRenameVirtual?(id)
     }
 
@@ -179,33 +224,64 @@ final class StatusBarController: NSObject {
         guard let dict = sender.representedObject as? [String: Any],
               let id = dict["id"] as? String,
               let w = dict["w"] as? Int,
-              let h = dict["h"] as? Int else { return }
+              let h = dict["h"] as? Int
+        else {
+            return
+        }
         onEditVirtualPreset?(id, w, h)
     }
 
     @objc private func editVirtualCustom(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? String else { return }
+        guard let id = sender.representedObject as? String else {
+            return
+        }
         onEditVirtualCustom?(id)
     }
 
     @objc private func removeVirtual(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? String else { return }
+        guard let id = sender.representedObject as? String else {
+            return
+        }
         onRemoveVirtual?(id)
     }
 
     @objc private func addVirtualPreset(_ sender: NSMenuItem) {
         guard let dict = sender.representedObject as? [String: Int],
-              let w = dict["w"], let h = dict["h"] else { return }
+              let w = dict["w"], let h = dict["h"]
+        else {
+            return
+        }
         onAddVirtualPreset?(w, h)
     }
 
-    @objc private func addVirtualCustom() { onAddVirtualCustom?() }
+    @objc private func addVirtualCustom() {
+        onAddVirtualCustom?()
+    }
 
-    @objc private func quitApp() { NSApp.terminate(nil) }
+    // Preferências
+    @objc private func setFPS(_ sender: NSMenuItem) {
+        if let fps = sender.representedObject as? Int {
+            onSetFPS?(fps)
+        }
+    }
+
+    @objc private func toggleHalfRes(_ sender: NSMenuItem) {
+        let newVal = !(Preferences.previewHalfRes)
+        sender.state = newVal ? .on : .off
+        onToggleHalfRes?(newVal)
+    }
+
+    @objc private func quitApp() {
+        NSApp.terminate(nil)
+    }
+
+    // Utils e activeDisplaysInfo permanecem como estão
 
     // Utils
     private static func uuidString(for displayID: CGDirectDisplayID) -> String? {
-        guard let cf = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue() else { return nil }
+        guard let cf = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue() else {
+            return nil
+        }
         return CFUUIDCreateString(nil, cf) as String
     }
 
@@ -222,7 +298,9 @@ final class StatusBarController: NSObject {
         var active = [CGDirectDisplayID](repeating: 0, count: Int(max))
         var count: UInt32 = 0
         let err = CGGetActiveDisplayList(max, &active, &count)
-        guard err == .success else { return [] }
+        guard err == .success else {
+            return []
+        }
         let list = Array(active.prefix(Int(count)))
 
         var namesByID: [CGDirectDisplayID: String] = [:]
@@ -234,7 +312,9 @@ final class StatusBarController: NSObject {
         }
 
         return list.compactMap { id in
-            guard let cfUUID = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue() else { return nil }
+            guard let cfUUID = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue() else {
+                return nil
+            }
             let uuidStr = (CFUUIDCreateString(nil, cfUUID) as String)
             let w = Int(CGDisplayPixelsWide(id))
             let h = Int(CGDisplayPixelsHigh(id))
