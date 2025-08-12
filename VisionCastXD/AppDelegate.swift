@@ -95,7 +95,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             defaults.set(w, forKey: self.kCustomWidth)
             defaults.set(h, forKey: self.kCustomHeight)
             self.applyPixelPerfectResolution(width: w, height: h)
-            self.screenVC?.applyVirtualDisplayMode(width: w, height: h) // <- aplica no display virtual também
+            self.screenVC?.applyVirtualDisplayMode(width: w, height: h)
         }
         sb.onOpenCustomResolution = { [weak self] in
             self?.openCustomResolutionWindow()
@@ -104,9 +104,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             guard let cf = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue() else { return }
             let uuid = CFUUIDCreateString(nil, cf) as String
+
             var current = self.currentSelectedDisplayUUIDs()
-            if isOn { current.insert(uuid) } else { current.remove(uuid) }
-            if current.isEmpty { current = self.defaultDisplayUUIDs() }
+            if isOn {
+                current.insert(uuid)
+            } else {
+                current.remove(uuid)
+            }
+
+            // IMPORTANTE: não force selecionar nada se ficar vazio.
+            // Se ficar vazio, paramos tudo.
             UserDefaults.standard.set(Array(current), forKey: self.kSelectedDisplayUUIDs)
             MultiDisplayNDIManager.shared.setSelectedDisplays(current)
         }

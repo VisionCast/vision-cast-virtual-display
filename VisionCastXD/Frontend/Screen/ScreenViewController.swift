@@ -1,4 +1,3 @@
-import ApplicationServices // <- para AXIsProcessTrustedWithOptions
 import Cocoa
 import CoreImage
 import ReSwift
@@ -8,7 +7,7 @@ enum ScreenViewAction: Action {
 }
 
 class ScreenViewController: SubscriberViewController<ScreenViewData>, NSWindowDelegate {
-    private var ndiSender: NDISender?
+    // Removido o NDISender para evitar duplicação da tela virtual
     private var display: CGVirtualDisplay?
     private var stream: CGDisplayStream?
     private var isWindowHighlighted = false
@@ -22,7 +21,6 @@ class ScreenViewController: SubscriberViewController<ScreenViewData>, NSWindowDe
         ])
     }()
 
-    // Cria a view raiz quando não há XIB
     override func loadView() {
         let root = NSView(frame: .zero)
         root.wantsLayer = true
@@ -33,7 +31,6 @@ class ScreenViewController: SubscriberViewController<ScreenViewData>, NSWindowDe
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        // Descriptor do virtual display
         let descriptor = CGVirtualDisplayDescriptor()
         descriptor.queue = .main
         descriptor.name = "Vision Cast XD"
@@ -57,7 +54,6 @@ class ScreenViewController: SubscriberViewController<ScreenViewData>, NSWindowDe
         applyVirtualDisplayMode(width: w, height: h)
     }
 
-    // Converte os valores para UInt ao criar o modo
     func applyVirtualDisplayMode(width: Int, height: Int) {
         guard let display = display else { return }
         let settings = CGVirtualDisplaySettings()
@@ -100,17 +96,12 @@ class ScreenViewController: SubscriberViewController<ScreenViewData>, NSWindowDe
             let pixelWidth = Int(contentSize.width * backingScale)
             let pixelHeight = Int(contentSize.height * backingScale)
 
-            print("Creating NDISender with real content size \(pixelWidth)x\(pixelHeight)")
-            ndiSender = NDISender(name: "VisionCast NDI", width: pixelWidth, height: pixelHeight)
-            if ndiSender == nil {
-                print("❌ Falha ao iniciar NDI Sender")
-            }
-
             guard let display = display else {
                 print("Display virtual não está disponível; abortando criação do stream.")
                 return
             }
 
+            // Stream apenas para renderizar na janela (sem enviar NDI aqui)
             stream = CGDisplayStream(
                 dispatchQueueDisplay: display.displayID,
                 outputWidth: pixelWidth,
@@ -122,10 +113,10 @@ class ScreenViewController: SubscriberViewController<ScreenViewData>, NSWindowDe
                 guard let self = self, let surface = frameSurface else { return }
                 self.view.layer?.contents = surface
 
-                let ciImage = CIImage(ioSurface: surface)
-                if let cgImage = self.ciContext.createCGImage(ciImage, from: ciImage.extent) {
-                    self.ndiSender?.send(image: cgImage)
-                }
+                // Mantemos a conversão para CGImage apenas se precisar de efeitos
+                // Caso queira otimizar, pode remover o bloco abaixo
+                // let ciImage = CIImage(ioSurface: surface)
+                // _ = self.ciContext.createCGImage(ciImage, from: ciImage.extent)
             }
 
             stream?.start()
@@ -141,15 +132,5 @@ class ScreenViewController: SubscriberViewController<ScreenViewData>, NSWindowDe
             return frameSize
         }
         return window.frameRect(forContentRect: NSRect(origin: .zero, size: screenResolution)).size
-    }
-
-    @objc private func didClickOnScreen(_ gestureRecognizer: NSGestureRecognizer) {
-        guard let screenResolution = previousResolution else { return }
-        let clickedPoint = gestureRecognizer.location(in: view)
-        let onScreenPoint = NSPoint(
-            x: clickedPoint.x / view.frame.width * screenResolution.width,
-            y: (view.frame.height - clickedPoint.y) / view.frame.height * screenResolution.height
-        )
-        store.dispatch(MouseLocationAction.requestMove(toPoint: onScreenPoint))
     }
 }

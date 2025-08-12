@@ -5,17 +5,10 @@ import CoreImage
 final class MultiDisplayNDIManager {
     static let shared = MultiDisplayNDIManager()
 
-    // Conjunto de UUIDs de telas selecionadas para transmitir
-    // Persistência é gerenciada pelo AppDelegate/UserDefaults.
     private(set) var selectedDisplayUUIDs: Set<String> = []
+    private var observingDisplayChanges = false
 
-    func setSelectedDisplays(_ uuids: Set<String>) {
-        selectedDisplayUUIDs = uuids
-        // Reinicia com a nova seleção
-        restart()
-    }
-
-    private var ciContext: CIContext = {
+    private lazy var ciContext: CIContext = {
         let srgb = CGColorSpace(name: CGColorSpace.sRGB)!
         return CIContext(options: [.workingColorSpace: srgb, .outputColorSpace: srgb])
     }()
@@ -27,92 +20,147 @@ final class MultiDisplayNDIManager {
 
     private var pipelines: [CGDirectDisplayID: Pipeline] = [:]
 
-    // Inicia somente as telas selecionadas
     func start() {
-        buildPipelinesForSelectedDisplays()
-        // Observa mudanças de monitores (pluga/despluga)
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(displaysChanged),
-            name: NSApplication.didChangeScreenParametersNotification,
-            object: nil
-        )
+        if !observingDisplayChanges {
+            observingDisplayChanges = true
+            NotificationCenter.default.addObserver(self, selector: #selector(displaysChanged),
+                                                   name: NSApplication.didChangeScreenParametersNotification, object: nil)
+        }
+        applySelection()
     }
 
-    func restart() {
-        stopAll()
-        buildPipelinesForSelectedDisplays()
-    }
+    func setSelectedDisplays(_ uuids: Set<String>) {
+        let old = selectedDisplayUUIDs
+        selectedDisplayUUIDs = uuids
 
-    private func buildPipelinesForSelectedDisplays() {
-        guard !selectedDisplayUUIDs.isEmpty else { return }
-
-        // Lista displays ativos
-        var max = UInt32(16)
-        var activeDisplays = [CGDirectDisplayID](repeating: 0, count: Int(max))
-        var count: UInt32 = 0
-        let err = CGGetActiveDisplayList(max, &activeDisplays, &count)
-        guard err == .success else {
-            print("CGGetActiveDisplayList falhou: \(err.rawValue)")
+        // Se ficar vazio: encerra tudo já (encerra anúncio NDI também)
+        if uuids.isEmpty {
+            stopAll()
+            print("NDI: seleção vazia — todos pipelines parados")
             return
         }
-        activeDisplays = Array(activeDisplays.prefix(Int(count)))
 
-        // Filtra pelos UUIDs selecionados
-        let selectedIDs: [CGDirectDisplayID] = activeDisplays.compactMap { id in
-            guard let cf = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue() else { return nil }
-            let uuid = CFUUIDCreateString(nil, cf) as String
-            return selectedDisplayUUIDs.contains(uuid) ? id : nil
+        let map = currentUUIDToDisplayID()
+
+        let toStop = old.subtracting(uuids)
+        for u in toStop {
+            if let id = map[u] {
+                stopPipeline(for: id)
+                print("NDI: parou (delta) \(id) para UUID \(u)")
+            }
         }
 
-        for (index, displayID) in selectedIDs.enumerated() {
-            let width = Int(CGDisplayPixelsWide(displayID))
-            let height = Int(CGDisplayPixelsHigh(displayID))
-            guard width > 0, height > 0 else { continue }
-
-            let name = "VisionCast NDI - Display \(index + 1)"
-
-            guard let sender = NDISender(name: name, width: width, height: height) else {
-                print("❌ NDI sender falhou para display \(displayID)")
-                continue
+        let toStart = uuids.subtracting(old)
+        for u in toStart {
+            if let id = map[u] {
+                startPipeline(for: id)
+                print("NDI: iniciou (delta) \(id) para UUID \(u)")
             }
-
-            let props: CFDictionary = [CGDisplayStream.showCursor: true] as CFDictionary
-
-            guard let stream = CGDisplayStream(
-                dispatchQueueDisplay: displayID,
-                outputWidth: width,
-                outputHeight: height,
-                pixelFormat: Int32(kCVPixelFormatType_32BGRA),
-                properties: props,
-                queue: .main,
-                handler: { [weak self] _, _, surface, _ in
-                    guard let self, let surface else { return }
-                    let ciImage = CIImage(ioSurface: surface)
-                    if let cg = self.ciContext.createCGImage(ciImage, from: ciImage.extent) {
-                        sender.send(image: cg)
-                    }
-                }
-            ) else {
-                print("❌ CGDisplayStream falhou para display \(displayID)")
-                continue
-            }
-
-            pipelines[displayID] = Pipeline(sender: sender, stream: stream)
-            stream.start()
         }
+
+        let activeIDs = pipelines.keys.map { Int($0) }.sorted()
+        print("NDI: seleção=\(selectedDisplayUUIDs.count) | ativos=\(activeIDs)")
     }
 
     func stopAll() {
-        for (_, p) in pipelines {
+        for (id, p) in pipelines {
             p.stream.stop()
+            p.sender.shutdown() // <- destrói explicitamente
+            print("NDI: parou \(id)")
         }
         pipelines.removeAll()
-        NotificationCenter.default.removeObserver(self, name: NSApplication.didChangeScreenParametersNotification, object: nil)
+        if observingDisplayChanges {
+            NotificationCenter.default.removeObserver(self, name: NSApplication.didChangeScreenParametersNotification, object: nil)
+            observingDisplayChanges = false
+        }
+        print("NDI: todos os pipelines encerrados")
+    }
+
+    private func applySelection() {
+        let map = currentUUIDToDisplayID()
+        let selectedIDsSet = Set(selectedDisplayUUIDs.compactMap { map[$0] })
+
+        let idsToStop = Set(pipelines.keys).subtracting(selectedIDsSet)
+        for id in idsToStop {
+            stopPipeline(for: id)
+            print("NDI: parou (sync) \(id)")
+        }
+
+        let idsToStart = selectedIDsSet.subtracting(Set(pipelines.keys))
+        for id in idsToStart {
+            startPipeline(for: id)
+            print("NDI: iniciou (sync) \(id)")
+        }
+
+        let activeIDs = pipelines.keys.map { Int($0) }.sorted()
+        print("NDI: seleção(sync)=\(selectedDisplayUUIDs.count) | ativos=\(activeIDs)")
+    }
+
+    private func currentUUIDToDisplayID() -> [String: CGDirectDisplayID] {
+        var max = UInt32(16)
+        var activeDisplays = [CGDirectDisplayID](repeating: 0, count: Int(max))
+        var count: UInt32 = 0
+        guard CGGetActiveDisplayList(max, &activeDisplays, &count) == .success else { return [:] }
+
+        let list = Array(activeDisplays.prefix(Int(count)))
+        var map: [String: CGDirectDisplayID] = [:]
+        for id in list {
+            if let cf = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue() {
+                let uuid = CFUUIDCreateString(nil, cf) as String
+                map[uuid] = id
+            }
+        }
+        return map
+    }
+
+    private func startPipeline(for displayID: CGDirectDisplayID) {
+        if pipelines[displayID] != nil { return }
+
+        let width = Int(CGDisplayPixelsWide(displayID))
+        let height = Int(CGDisplayPixelsHigh(displayID))
+        guard width > 0, height > 0 else { return }
+
+        let name = "VisionCast NDI - \(displayID)"
+
+        guard let sender = NDISender(name: name, width: width, height: height) else {
+            print("❌ NDI sender falhou para display \(displayID)")
+            return
+        }
+
+        let props: CFDictionary = [CGDisplayStream.showCursor: true] as CFDictionary
+
+        guard let stream = CGDisplayStream(
+            dispatchQueueDisplay: displayID,
+            outputWidth: width,
+            outputHeight: height,
+            pixelFormat: Int32(kCVPixelFormatType_32BGRA),
+            properties: props,
+            queue: .main,
+            handler: { [weak self] _, _, surface, _ in
+                guard let self, let surface else { return }
+                let ciImage = CIImage(ioSurface: surface)
+                if let cg = self.ciContext.createCGImage(ciImage, from: ciImage.extent) {
+                    sender.send(image: cg)
+                }
+            }
+        ) else {
+            print("❌ CGDisplayStream falhou para display \(displayID)")
+            sender.shutdown()
+            return
+        }
+
+        pipelines[displayID] = Pipeline(sender: sender, stream: stream)
+        stream.start()
+        print("NDI: iniciou display \(displayID) \(width)x\(height)")
+    }
+
+    private func stopPipeline(for displayID: CGDirectDisplayID) {
+        guard let p = pipelines.removeValue(forKey: displayID) else { return }
+        p.stream.stop()
+        p.sender.shutdown() // <- destrói o sender (encerra anúncio NDI)
     }
 
     @objc private func displaysChanged() {
-        // Recria pipelines quando os displays mudam, respeitando a seleção atual
-        restart()
+        applySelection()
     }
 }

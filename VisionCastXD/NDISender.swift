@@ -81,6 +81,19 @@ class NDISender {
         free(bitmapData)
     }
 
+    // Encerra imediatamente o anúncio NDI e captura de áudio
+    func shutdown() {
+        audioEngine.stop()
+        if let sendInstance {
+            NDIlib_send_destroy(sendInstance)
+            self.sendInstance = nil
+        }
+        if let nameCString {
+            free(nameCString)
+            self.nameCString = nil
+        }
+    }
+
     private func startAudioCapture() {
         let inputNode = audioEngine.inputNode
         let bus = 0
@@ -111,7 +124,7 @@ class NDISender {
 
         let frames = Int(buffer.frameLength)
         let channels = Int(buffer.format.channelCount)
-        let samplesCount = frames * 2 // sempre enviando stereo
+        let samplesCount = frames * 2 // stereo
 
         let interleaved = UnsafeMutablePointer<Float>.allocate(capacity: samplesCount)
 
@@ -148,12 +161,6 @@ class NDISender {
     }
 
     deinit {
-        if let sendInstance {
-            NDIlib_send_destroy(sendInstance)
-        }
-        if let nameCString {
-            free(nameCString)
-        }
-        audioEngine.stop()
+        shutdown()
     }
 }
