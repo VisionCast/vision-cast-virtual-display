@@ -7,13 +7,15 @@ enum AppDelegateAction: Action {
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!
-    private var ndiInitialized = false // <- adicionada
+    private var ndiInitialized = false
+    private var statusBar: StatusBarController?
+    private var screenVC: ScreenViewController! // <- manter referência
+
+    private let kCustomWidth = "customWidth"
+    private let kCustomHeight = "customHeight"
+    private let kSelectedDisplayUUIDs = "selectedDisplayUUIDs"
 
     func applicationDidFinishLaunching(_: Notification) {
-        // Se estiver usando o header "Processing.NDI.DynamicLoad.h", primeiro carregue:
-        // if !NDIlib_v5_load() { print("Falha ao carregar NDI (DynamicLoad)"); return }
-
-        // Inicializa NDI antes de qualquer uso (ex.: NDIlib_send_create)
         if NDIlib_initialize() {
             ndiInitialized = true
             print("NDI inicializado com sucesso")
@@ -22,18 +24,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let viewController = ScreenViewController()
+        screenVC = viewController
 
-        // Lê resolução custom ou usa default
         let defaults = UserDefaults.standard
-        let requestedWidth: Int = defaults.integer(forKey: "customWidth") > 0 ? defaults.integer(forKey: "customWidth") : 1408
-        let requestedHeight: Int = defaults.integer(forKey: "customHeight") > 0 ? defaults.integer(forKey: "customHeight") : 640
+        let requestedWidth: Int = defaults.integer(forKey: kCustomWidth) > 0 ? defaults.integer(forKey: kCustomWidth) : 1408
+        let requestedHeight: Int = defaults.integer(forKey: kCustomHeight) > 0 ? defaults.integer(forKey: kCustomHeight) : 640
 
-        // Busca escala da tela principal
         let scale = NSScreen.main?.backingScaleFactor ?? 1.0
         let widthInPoints = CGFloat(requestedWidth) / scale
         let heightInPoints = CGFloat(requestedHeight) / scale
 
-        // Inicializa a janela com tamanho já compensado em pontos
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: widthInPoints, height: heightInPoints),
             styleMask: [.titled, .closable, .resizable],
@@ -41,7 +41,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             defer: false
         )
 
-        // Configura controller e propriedades
         window.contentViewController = viewController
         window.delegate = viewController
         window.title = "Vision Cast XD"
@@ -54,7 +53,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.styleMask.insert(.resizable)
         window.collectionBehavior.insert(.fullScreenNone)
 
-        // Configura camadas e escala 1.0 para evitar redimensionamento automático
         window.contentView?.wantsLayer = true
         if let layer = window.contentView?.layer {
             layer.contentsScale = 1.0
@@ -62,44 +60,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         window.contentView?.wantsBestResolutionOpenGLSurface = false
 
-        // Aplica resolução corrigida para pixels reais (ajusta o tamanho e centraliza)
         applyPixelPerfectResolution(width: requestedWidth, height: requestedHeight)
-
         window.makeKeyAndOrderFront(nil)
 
-        // Inicia o envio NDI de TODAS as telas físicas (além da virtual)
-        // Requer permissão de Screen Recording na primeira execução.
+        setupStatusBar()
+
+        let selected = loadOrCreateDefaultSelectedDisplayUUIDs()
+        MultiDisplayNDIManager.shared.setSelectedDisplays(selected)
         if ndiInitialized {
-            MultiDisplayNDIManager.shared.startAllDisplays()
+            MultiDisplayNDIManager.shared.start()
         }
 
-        // Logs para debug
-        if let screen = window.screen {
-            print("Window is on screen with frame: \(screen.frame)")
-            print("Screen backing scale factor: \(screen.backingScaleFactor)")
-        }
-        print("Window backing scale: \(window.backingScaleFactor)")
-        print("Window frame: \(window.frame)")
-        print("Window content size: \(window.contentView?.frame.size ?? .zero)")
-
-        // Configura menu
+        // Menu de app, atalho para "Custom Resolution..." e "Quit"
         let mainMenu = NSMenu()
         let mainMenuItem = NSMenuItem()
         let subMenu = NSMenu(title: "MainMenu")
-
-        let resolutionItem = NSMenuItem(
-            title: "Custom Resolution...",
-            action: #selector(openCustomResolutionWindow),
-            keyEquivalent: "r"
-        )
+        let resolutionItem = NSMenuItem(title: "Custom Resolution...", action: #selector(openCustomResolutionWindow), keyEquivalent: "r")
         resolutionItem.target = self
         subMenu.addItem(resolutionItem)
-
-        let quitMenuItem = NSMenuItem(
-            title: "Quit",
-            action: #selector(NSApp.terminate),
-            keyEquivalent: "q"
-        )
+        let quitMenuItem = NSMenuItem(title: "Quit", action: #selector(NSApp.terminate), keyEquivalent: "q")
         subMenu.addItem(quitMenuItem)
         mainMenuItem.submenu = subMenu
         mainMenu.items = [mainMenuItem]
@@ -108,9 +87,88 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         store.dispatch(AppDelegateAction.didFinishLaunching)
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication) -> Bool {
-        return true
+    private func setupStatusBar() {
+        let sb = StatusBarController()
+        sb.onPickResolution = { [weak self] w, h in
+            guard let self else { return }
+            let defaults = UserDefaults.standard
+            defaults.set(w, forKey: self.kCustomWidth)
+            defaults.set(h, forKey: self.kCustomHeight)
+            self.applyPixelPerfectResolution(width: w, height: h)
+            self.screenVC?.applyVirtualDisplayMode(width: w, height: h) // <- aplica no display virtual também
+        }
+        sb.onOpenCustomResolution = { [weak self] in
+            self?.openCustomResolutionWindow()
+        }
+        sb.onToggleDisplay = { [weak self] displayID, isOn in
+            guard let self else { return }
+            guard let cf = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue() else { return }
+            let uuid = CFUUIDCreateString(nil, cf) as String
+            var current = self.currentSelectedDisplayUUIDs()
+            if isOn { current.insert(uuid) } else { current.remove(uuid) }
+            if current.isEmpty { current = self.defaultDisplayUUIDs() }
+            UserDefaults.standard.set(Array(current), forKey: self.kSelectedDisplayUUIDs)
+            MultiDisplayNDIManager.shared.setSelectedDisplays(current)
+        }
+        sb.selectedUUIDsProvider = { [weak self] in
+            self?.currentSelectedDisplayUUIDs() ?? []
+        }
+        statusBar = sb
     }
+
+    private func currentSelectedDisplayUUIDs() -> Set<String> {
+        let defaults = UserDefaults.standard
+        if let arr = defaults.array(forKey: kSelectedDisplayUUIDs) as? [String] {
+            return Set(arr)
+        }
+        return []
+    }
+
+    private func loadOrCreateDefaultSelectedDisplayUUIDs() -> Set<String> {
+        let existing = currentSelectedDisplayUUIDs()
+        if !existing.isEmpty { return existing }
+        let def = defaultDisplayUUIDs()
+        UserDefaults.standard.set(Array(def), forKey: kSelectedDisplayUUIDs)
+        return def
+    }
+
+    private func defaultDisplayUUIDs() -> Set<String> {
+        // Tenta achar a tela virtual criada pelo app:
+        // usamos vendorID/productID definidos no ScreenViewController (0x3456/0x1234).
+        let targetVendor: UInt32 = 0x3456
+        let targetProd: UInt32 = 0x1234
+
+        var max = UInt32(16)
+        var active = [CGDirectDisplayID](repeating: 0, count: Int(max))
+        var count: UInt32 = 0
+        _ = CGGetActiveDisplayList(max, &active, &count)
+        let list = Array(active.prefix(Int(count)))
+
+        var preferred: CGDirectDisplayID?
+
+        for id in list {
+            let vendor = CGDisplayVendorNumber(id)
+            let model = CGDisplayModelNumber(id)
+            if vendor == targetVendor, model == targetProd {
+                preferred = id
+                break
+            }
+        }
+
+        let chosenID = preferred ?? NSScreen.main.flatMap {
+            ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber).map { CGDirectDisplayID($0.uint32Value) }
+        }
+
+        if let id = chosenID,
+           let cf = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue()
+        {
+            let uuid = CFUUIDCreateString(nil, cf) as String
+            return [uuid]
+        }
+        return []
+    }
+
+    // MARK: - Resolução
 
     @objc func openCustomResolutionWindow() {
         let controller = CustomResolutionWindowController()
@@ -119,12 +177,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applyStoredResolution() {
         let defaults = UserDefaults.standard
-        let width = defaults.integer(forKey: "customWidth")
-        let height = defaults.integer(forKey: "customHeight")
+        let width = defaults.integer(forKey: kCustomWidth)
+        let height = defaults.integer(forKey: kCustomHeight)
         applyPixelPerfectResolution(width: width, height: height)
     }
 
-    // Método que ajusta tamanho compensando backingScale e centraliza janela
     func applyPixelPerfectResolution(width: Int, height: Int) {
         guard width > 0, height > 0 else { return }
         guard let screen = window.screen ?? NSScreen.main else {
@@ -147,9 +204,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_: Notification) {
-        // Pare os streams de todos os monitores antes de destruir a NDI
         MultiDisplayNDIManager.shared.stopAll()
-
         if ndiInitialized {
             NDIlib_destroy()
         }
