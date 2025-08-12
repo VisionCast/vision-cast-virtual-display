@@ -1,5 +1,221 @@
 import Cocoa
+import Network
 import ReSwift
+
+protocol LocalHTTPServerDelegate: AnyObject {
+    func httpServerListStreamsJSON() -> Data
+    func httpServerStartStream(uuid: String) -> Data
+    func httpServerStopStream(uuid: String) -> Data
+    func httpServerJPEGFrame(uuid: String) -> Data?
+}
+
+final class LocalHTTPServer {
+    private let port: UInt16
+    private var listener: NWListener?
+    private weak var delegate: LocalHTTPServerDelegate?
+    private struct MJPEGContext {
+        let connection: NWConnection
+        let uuid: String
+        var timer: Timer?
+    }
+
+    private var mjpegSessions: [ObjectIdentifier: MJPEGContext] = [:]
+
+    init(port: UInt16, delegate: LocalHTTPServerDelegate) {
+        self.port = port
+        self.delegate = delegate
+    }
+
+    func start() {
+        do {
+            let params = NWParameters.tcp
+            let listener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
+            self.listener = listener
+            listener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    print("LocalHTTPServer ready on port \(self.port)")
+                case let .failed(err):
+                    print("LocalHTTPServer failed: \(err)")
+                default:
+                    break
+                }
+            }
+            listener.newConnectionHandler = { [weak self] connection in
+                self?.handle(connection: connection)
+            }
+            listener.start(queue: .main)
+        } catch {
+            print("LocalHTTPServer error starting: \(error)")
+        }
+    }
+
+    func stop() {
+        listener?.cancel()
+        listener = nil
+    }
+
+    // MARK: - Connection handling
+
+    private func handle(connection: NWConnection) {
+        connection.stateUpdateHandler = { state in
+            switch state {
+            case .ready:
+                self.receive(on: connection)
+            case let .failed(err):
+                print("HTTP connection failed: \(err)")
+                connection.cancel()
+            case .cancelled:
+                break
+            default:
+                break
+            }
+        }
+        connection.start(queue: .main)
+    }
+
+    private func receive(on connection: NWConnection) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, isComplete, error in
+            guard let self else { return }
+            if let error = error {
+                print("HTTP receive error: \(error)")
+                connection.cancel()
+                return
+            }
+            guard let data = data, !data.isEmpty else {
+                if isComplete { connection.cancel() }
+                else { self.receive(on: connection) }
+                return
+            }
+            // Very small HTTP/1.1 parser for GET/POST/OPTIONS
+            let request = String(decoding: data, as: UTF8.self)
+            let lines = request.split(separator: "\r\n", omittingEmptySubsequences: false)
+            guard let requestLine = lines.first else { self.send(status: 400, body: Data(), on: connection); return }
+            let parts = requestLine.split(separator: " ")
+            guard parts.count >= 2 else { self.send(status: 400, body: Data(), on: connection); return }
+            let method = String(parts[0])
+            let path = String(parts[1])
+
+            if method == "OPTIONS" {
+                self.send(status: 204, body: Data(), on: connection)
+                return
+            }
+
+            // Routes
+            if method == "GET", path == "/api/streams" {
+                let json = delegate?.httpServerListStreamsJSON() ?? Data()
+                self.sendJSON(json, on: connection)
+                return
+            }
+            if method == "POST", path.hasPrefix("/api/streams/"), path.hasSuffix("/start") {
+                if let uuid = path.components(separatedBy: "/").dropFirst(3).first {
+                    let json = delegate?.httpServerStartStream(uuid: uuid) ?? Data()
+                    self.sendJSON(json, on: connection)
+                    return
+                }
+            }
+            if method == "POST", path.hasPrefix("/api/streams/"), path.hasSuffix("/stop") {
+                if let uuid = path.components(separatedBy: "/").dropFirst(3).first {
+                    let json = delegate?.httpServerStopStream(uuid: uuid) ?? Data()
+                    self.sendJSON(json, on: connection)
+                    return
+                }
+            }
+
+            // GET /api/streams/{uuid}/preview.mjpg
+            if method == "GET", path.hasPrefix("/api/streams/"), path.hasSuffix("/preview.mjpg") {
+                if let uuid = path.components(separatedBy: "/").dropFirst(3).first {
+                    self.startMJPEGStream(uuid: uuid, on: connection)
+                    return
+                }
+            }
+
+            // Fallback 404
+            let notFound = try? JSONSerialization.data(withJSONObject: ["error": "not found"], options: [])
+            self.send(status: 404, body: notFound ?? Data(), on: connection, contentType: "application/json")
+        }
+    }
+
+    private func sendJSON(_ body: Data, on connection: NWConnection) {
+        send(status: 200, body: body, on: connection, contentType: "application/json")
+    }
+
+    private func send(status: Int, body: Data, on connection: NWConnection, contentType: String = "text/plain") {
+        var headers = "HTTP/1.1 \(status) \(statusText(status))\r\n"
+        headers += "Content-Length: \(body.count)\r\n"
+        headers += "Content-Type: \(contentType)\r\n"
+        headers += "Connection: close\r\n"
+        headers += "Access-Control-Allow-Origin: *\r\n"
+        headers += "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
+        headers += "Access-Control-Allow-Headers: Content-Type\r\n\r\n"
+        let headData = Data(headers.utf8)
+        connection.send(content: headData + body, completion: .contentProcessed { _ in
+            connection.cancel()
+        })
+    }
+
+    private func startMJPEGStream(uuid: String, on connection: NWConnection) {
+        let boundary = "frameboundarya1b2c3"
+        let headers = "HTTP/1.1 200 OK\r\n"
+            + "Connection: close\r\n"
+            + "Cache-Control: no-cache, no-store, must-revalidate\r\n"
+            + "Pragma: no-cache\r\n"
+            + "Expires: 0\r\n"
+            + "Content-Type: multipart/x-mixed-replace; boundary=\(boundary)\r\n\r\n"
+
+        connection.send(content: Data(headers.utf8), completion: .contentProcessed { [weak self] _ in
+            guard let self else { return }
+            var ctx = MJPEGContext(connection: connection, uuid: uuid, timer: nil)
+            let id = ObjectIdentifier(connection)
+
+            // ~10 FPS
+            let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] t in
+                guard let self else { t.invalidate(); return }
+                guard let jpeg = self.delegate?.httpServerJPEGFrame(uuid: uuid) else { return }
+                var part = "\r\n--\(boundary)\r\n"
+                part += "Content-Type: image/jpeg\r\n"
+                part += "Content-Length: \(jpeg.count)\r\n\r\n"
+                let head = Data(part.utf8)
+                self.connectionSend(connection, data: head + jpeg)
+            }
+
+            ctx.timer = timer
+            self.mjpegSessions[id] = ctx
+        })
+
+        connection.stateUpdateHandler = { [weak self] st in
+            guard let self else { return }
+            if case .failed = st { self.stopMJPEG(on: connection) }
+            if case .cancelled = st { self.stopMJPEG(on: connection) }
+        }
+    }
+
+    private func stopMJPEG(on connection: NWConnection) {
+        let id = ObjectIdentifier(connection)
+        if var ctx = mjpegSessions.removeValue(forKey: id) {
+            ctx.timer?.invalidate()
+        }
+        connection.cancel()
+    }
+
+    private func connectionSend(_ connection: NWConnection, data: Data) {
+        connection.send(content: data, completion: .contentProcessed { [weak self] sendError in
+            if sendError != nil {
+                self?.stopMJPEG(on: connection)
+            }
+        })
+    }
+
+    private func statusText(_ code: Int) -> String {
+        switch code {
+        case 200: return "OK"
+        case 204: return "No Content"
+        case 400: return "Bad Request"
+        case 404: return "Not Found"
+        default: return "OK"
+        }
+    }
+}
 
 enum AppDelegateAction: Action {
     case didFinishLaunching
@@ -14,6 +230,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let refreshDebounce: TimeInterval = 0.3
 
     private let kSelectedDisplayUUIDs = "selectedDisplayUUIDs"
+
+    private var httpServer: LocalHTTPServer?
 
     func applicationDidFinishLaunching(_: Notification) {
         // Defaults (30 fps por padrão, preview half-res desligado)
@@ -55,6 +273,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(Array(selected), forKey: kSelectedDisplayUUIDs)
         MultiDisplayNDIManager.shared.setSelectedDisplays(selected)
         if ndiInitialized { MultiDisplayNDIManager.shared.start() }
+
+        // Start local HTTP API to expose streams on http://127.0.0.1:8777
+        let server = LocalHTTPServer(port: 8777, delegate: self)
+        httpServer = server
+        server.start()
 
         // Menu app
         let mainMenu = NSMenu()
@@ -422,8 +645,68 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // promptResolution / promptName / promptCreateFirstVirtual seguem iguais aos já adicionados
 
     func applicationWillTerminate(_: Notification) {
+        httpServer?.stop()
         NotificationCenter.default.removeObserver(self, name: Notification.Name("StatusBarRefreshRequest"), object: nil)
         MultiDisplayNDIManager.shared.stopAll()
         if ndiInitialized { NDIlib_destroy() }
+    }
+}
+
+extension AppDelegate: LocalHTTPServerDelegate {
+    // GET /api/streams
+    func httpServerListStreamsJSON() -> Data {
+        // Build a list with all virtual items + whether each UUID is selected for NDI
+        let selectedUUIDs = MultiDisplayNDIManager.shared.selectedDisplayUUIDs
+        let items = VirtualDisplayManager.shared.listForMenu().map { item -> [String: Any] in
+            var dict: [String: Any] = [
+                "id": item.id,
+                "title": item.title,
+                "size": item.size,
+                "enabled": item.enabled,
+            ]
+            if let uuid = VirtualDisplayManager.shared.uuidString(for: item.id) {
+                dict["uuid"] = uuid
+                dict["ndiEnabled"] = selectedUUIDs.contains(uuid)
+            }
+            return dict
+        }
+        let obj: [String: Any] = [
+            "streams": items,
+            "ndiRunning": ndiInitialized,
+        ]
+        let data = (try? JSONSerialization.data(withJSONObject: obj, options: [])) ?? Data()
+        return data
+    }
+
+    // POST /api/streams/{uuid}/start
+    func httpServerStartStream(uuid: String) -> Data {
+        var current = MultiDisplayNDIManager.shared.selectedDisplayUUIDs
+        current.insert(uuid)
+        UserDefaults.standard.set(Array(current), forKey: kSelectedDisplayUUIDs)
+        MultiDisplayNDIManager.shared.setSelectedDisplays(current)
+        if ndiInitialized { MultiDisplayNDIManager.shared.start() }
+        return httpServerListStreamsJSON()
+    }
+
+    // POST /api/streams/{uuid}/stop
+    func httpServerStopStream(uuid: String) -> Data {
+        var current = MultiDisplayNDIManager.shared.selectedDisplayUUIDs
+        current.remove(uuid)
+        UserDefaults.standard.set(Array(current), forKey: kSelectedDisplayUUIDs)
+        MultiDisplayNDIManager.shared.setSelectedDisplays(current)
+        return httpServerListStreamsJSON()
+    }
+
+    func httpServerJPEGFrame(uuid: String) -> Data? {
+        // Resolve virtual display ID from UUID
+        guard let itemID = VirtualDisplayManager.shared.listForMenu()
+            .first(where: { VirtualDisplayManager.shared.uuidString(for: $0.id) == uuid })?.id,
+            let did = VirtualDisplayManager.shared.cgDisplayID(for: itemID),
+            let cgimg = CGDisplayCreateImage(did)
+        else {
+            return nil
+        }
+        let rep = NSBitmapImageRep(cgImage: cgimg)
+        return rep.representation(using: .jpeg, properties: [.compressionFactor: 0.7])
     }
 }
