@@ -73,7 +73,7 @@ final class StatusBarController: NSObject {
             empty.isEnabled = false
             menu.addItem(empty)
         } else {
-            for it in vItems {
+            for (index, it) in vItems.enumerated() {
                 let parent = NSMenuItem(title: "\(it.title) (\(it.sizeText))", action: nil, keyEquivalent: "")
                 let sub = NSMenu(title: it.title)
 
@@ -90,7 +90,7 @@ final class StatusBarController: NSObject {
                 rename.representedObject = it.id
                 sub.addItem(rename)
 
-                // Mudar Resolução (presets + custom)
+                // Mudar Resolução
                 let resSub = NSMenu(title: "Mudar Resolução")
                 for r in resolutions {
                     let item = NSMenuItem(title: r.label, action: #selector(editVirtualPreset(_:)), keyEquivalent: "")
@@ -107,6 +107,12 @@ final class StatusBarController: NSObject {
                 let resRoot = NSMenuItem(title: "Mudar Resolução", action: nil, keyEquivalent: "")
                 resRoot.submenu = resSub
                 sub.addItem(resRoot)
+
+                // Copiar URL simples
+                let copyURL = NSMenuItem(title: "Copiar URL", action: #selector(copyVirtualURL(_:)), keyEquivalent: "")
+                copyURL.target = self
+                copyURL.representedObject = index + 1 // 1-based index
+                sub.addItem(copyURL)
 
                 // Remover
                 let remove = NSMenuItem(title: "Remover", action: #selector(removeVirtual(_:)), keyEquivalent: "")
@@ -193,6 +199,42 @@ final class StatusBarController: NSObject {
         quit.target = self
         menu.addItem(quit)
         return menu
+    }
+
+    // Copiar URL simples
+    @objc private func copyVirtualURL(_ sender: NSMenuItem) {
+        guard let index = sender.representedObject as? Int else { return }
+        let ip = getLocalIPAddress() ?? "localhost"
+        let url = "http://\(ip):8777/display/\(index)"
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(url, forType: .string)
+    }
+
+    private func getLocalIPAddress() -> String? {
+        var address: String?
+        var ifaddr: UnsafeMutablePointer<ifaddrs>?
+        if getifaddrs(&ifaddr) == 0 {
+            var ptr = ifaddr
+            while ptr != nil {
+                let interface = ptr!.pointee
+                let addrFamily = interface.ifa_addr.pointee.sa_family
+                if addrFamily == UInt8(AF_INET) {
+                    if let name = String(validatingUTF8: interface.ifa_name), name != "lo0" {
+                        var addr = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                        getnameinfo(interface.ifa_addr,
+                                    socklen_t(interface.ifa_addr.pointee.sa_len),
+                                    &addr, socklen_t(addr.count),
+                                    nil, socklen_t(0), NI_NUMERICHOST)
+                        address = String(cString: addr)
+                        break
+                    }
+                }
+                ptr = interface.ifa_next
+            }
+            freeifaddrs(ifaddr)
+        }
+        return address
     }
 
     // Callbacks

@@ -130,6 +130,23 @@ final class LocalHTTPServer {
                 }
             }
 
+            // GET /display/{n}
+            if method == "GET", path.hasPrefix("/display/") {
+                if let numStr = path.split(separator: "/").dropFirst().first,
+                   let index = Int(numStr),
+                   index > 0
+                {
+                    let items = VirtualDisplayManager.shared.listForMenu()
+                    if index <= items.count,
+                       let uuid = VirtualDisplayManager.shared.uuidString(for: items[index - 1].id)
+                    {
+                        // Redireciona ou serve diretamente o MJPEG
+                        self.startMJPEGStream(uuid: uuid, on: connection)
+                        return
+                    }
+                }
+            }
+
             // Fallback 404
             let notFound = try? JSONSerialization.data(withJSONObject: ["error": "not found"], options: [])
             self.send(status: 404, body: notFound ?? Data(), on: connection, contentType: "application/json")
@@ -700,15 +717,50 @@ extension AppDelegate: LocalHTTPServerDelegate {
     }
 
     func httpServerJPEGFrame(uuid: String) -> Data? {
-        // Resolve virtual display ID from UUID
-        guard let itemID = VirtualDisplayManager.shared.listForMenu()
-            .first(where: { VirtualDisplayManager.shared.uuidString(for: $0.id) == uuid })?.id,
-            let did = VirtualDisplayManager.shared.cgDisplayID(for: itemID),
+        // Localiza a tela virtual
+        guard let item = VirtualDisplayManager.shared.listForMenu()
+            .first(where: { VirtualDisplayManager.shared.uuidString(for: $0.id) == uuid }),
+            let did = VirtualDisplayManager.shared.cgDisplayID(for: item.id),
             let cgimg = CGDisplayCreateImage(did)
         else {
             return nil
         }
-        let rep = NSBitmapImageRep(cgImage: cgimg)
+
+        // Tamanho da tela capturada
+        let srcWidth = CGFloat(cgimg.width)
+        let srcHeight = CGFloat(cgimg.height)
+
+        // Escolhe tamanho alvo com base na tela capturada (escala para um "limite" sem ultrapassar)
+        let maxWidth: CGFloat = 1920
+        let maxHeight: CGFloat = 1080
+
+        // Calcula escala proporcional para encaixar no canvas alvo
+        let scale = min(maxWidth / srcWidth, maxHeight / srcHeight)
+        let targetWidth = srcWidth * scale
+        let targetHeight = srcHeight * scale
+
+        // Cria imagem final no tamanho alvo fixo (maxWidth × maxHeight)
+        let outImage = NSImage(size: NSSize(width: maxWidth, height: maxHeight))
+        outImage.lockFocus()
+        NSColor.black.setFill()
+        NSBezierPath(rect: NSRect(x: 0, y: 0, width: maxWidth, height: maxHeight)).fill()
+
+        // Desenha imagem centralizada mantendo proporção
+        let offsetX = (maxWidth - targetWidth) / 2
+        let offsetY = (maxHeight - targetHeight) / 2
+        let image = NSImage(cgImage: cgimg, size: NSSize(width: srcWidth, height: srcHeight))
+        image.draw(in: NSRect(x: offsetX, y: offsetY, width: targetWidth, height: targetHeight),
+                   from: .zero,
+                   operation: .sourceOver,
+                   fraction: 1.0)
+        outImage.unlockFocus()
+
+        // Exporta JPEG
+        guard let tiff = outImage.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff)
+        else {
+            return nil
+        }
         return rep.representation(using: .jpeg, properties: [.compressionFactor: 0.7])
     }
 }
