@@ -177,7 +177,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusBar = sb
     }
 
-    // Dialogs utilitários
+    // MARK: - Dialogs utilitários
+
     private func promptAddCustomVirtual() {
         let (w, h) = promptResolution(defaultW: 1920, defaultH: 1080) ?? (0, 0)
         guard w > 0, h > 0 else {
@@ -219,6 +220,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusBar?.refresh()
     }
 
+    // Formatter que aceita apenas dígitos e aciona um callback quando inválido
+    private final class DigitsOnlyFormatter: NumberFormatter {
+        private let onInvalid: (() -> Void)?
+
+        init(onInvalid: (() -> Void)? = nil) {
+            self.onInvalid = onInvalid
+            super.init()
+            numberStyle = .none
+            minimum = 1
+            maximum = 100_000
+            allowsFloats = false
+            generatesDecimalNumbers = false
+        }
+
+        required init?(coder: NSCoder) {
+            onInvalid = nil
+            super.init(coder: coder)
+        }
+
+        override func isPartialStringValid(_ partialString: String,
+                                           newEditingString _: AutoreleasingUnsafeMutablePointer<NSString?>?,
+                                           errorDescription _: AutoreleasingUnsafeMutablePointer<NSString?>?) -> Bool
+        {
+            if partialString.isEmpty { return true }
+            if partialString.allSatisfy({ $0.isNumber }) { return true }
+            NSSound.beep()
+            onInvalid?()
+            return false
+        }
+    }
+
     private func promptEditResolutionVirtual(id: String) {
         let (w, h) = promptResolution(defaultW: 1920, defaultH: 1080) ?? (0, 0)
         guard w > 0, h > 0 else {
@@ -228,53 +260,65 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusBar?.refresh()
     }
 
+    // Aceita apenas números; mostra aviso ao tentar caractere inválido e valida ao confirmar
     private func promptResolution(defaultW: Int, defaultH: Int) -> (Int, Int)? {
-        let alert = NSAlert()
-        alert.messageText = "Resolução"
-        alert.informativeText = "Defina largura × altura (em pixels)."
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Cancelar")
+        while true {
+            let alert = NSAlert()
+            alert.messageText = "Resolução"
+            alert.informativeText = "Digite apenas números (largura × altura em pixels)."
+            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: "Cancelar")
 
-        let numberFormatter: NumberFormatter = {
-            let nf = NumberFormatter()
-            nf.numberStyle = .none
-            nf.minimum = 1
-            nf.maximum = 100_000
-            nf.allowsFloats = false
-            return nf
-        }()
+            let errorLabel = NSTextField(labelWithString: "Somente números")
+            errorLabel.textColor = .systemRed
+            errorLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+            errorLabel.isHidden = true
+            errorLabel.frame = NSRect(x: 0, y: 4, width: 260, height: 16)
 
-        let widthField = NSTextField(string: "\(defaultW)")
-        widthField.alignment = .right
-        widthField.frame = NSRect(x: 0, y: 28, width: 120, height: 24)
-        widthField.formatter = numberFormatter
+            let formatter = DigitsOnlyFormatter(onInvalid: { [weak errorLabel] in
+                errorLabel?.isHidden = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                    errorLabel?.isHidden = true
+                }
+            })
 
-        let xLabel = NSTextField(labelWithString: "×")
-        xLabel.frame = NSRect(x: 124, y: 28, width: 14, height: 24)
-        xLabel.alignment = .center
+            let widthField = NSTextField(string: "\(defaultW)")
+            widthField.alignment = .right
+            widthField.frame = NSRect(x: 0, y: 28, width: 120, height: 24)
+            widthField.placeholderString = "Largura"
+            widthField.formatter = formatter
 
-        let heightField = NSTextField(string: "\(defaultH)")
-        heightField.alignment = .right
-        heightField.frame = NSRect(x: 140, y: 28, width: 120, height: 24)
-        heightField.formatter = numberFormatter
+            let xLabel = NSTextField(labelWithString: "×")
+            xLabel.frame = NSRect(x: 124, y: 28, width: 14, height: 24)
+            xLabel.alignment = .center
 
-        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 60))
-        accessory.addSubview(widthField)
-        accessory.addSubview(xLabel)
-        accessory.addSubview(heightField)
-        alert.accessoryView = accessory
+            let heightField = NSTextField(string: "\(defaultH)")
+            heightField.alignment = .right
+            heightField.frame = NSRect(x: 140, y: 28, width: 120, height: 24)
+            heightField.placeholderString = "Altura"
+            heightField.formatter = formatter
 
-        guard alert.runModal() == .alertFirstButtonReturn else {
-            return nil
+            let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 60))
+            accessory.addSubview(widthField)
+            accessory.addSubview(xLabel)
+            accessory.addSubview(heightField)
+            accessory.addSubview(errorLabel)
+            alert.accessoryView = accessory
+
+            let resp = alert.runModal()
+            guard resp == .alertFirstButtonReturn else { return nil }
+
+            let w = (widthField.stringValue as NSString).integerValue
+            let h = (heightField.stringValue as NSString).integerValue
+            if w > 0, h > 0 { return (w, h) }
+
+            let err = NSAlert()
+            err.messageText = "Valor inválido"
+            err.informativeText = "Use apenas números maiores que zero para largura e altura."
+            err.addButton(withTitle: "OK")
+            err.runModal()
+            // Repete até valores válidos ou Cancelar
         }
-
-        // Como usamos formatter, os valores já são numéricos válidos
-        let w = (widthField.stringValue as NSString).integerValue
-        let h = (heightField.stringValue as NSString).integerValue
-        guard w > 0, h > 0 else {
-            return nil
-        }
-        return (w, h)
     }
 
     // Compatibilidade (caso algum fluxo legado chame)
