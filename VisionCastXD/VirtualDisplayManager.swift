@@ -206,7 +206,20 @@ final class VirtualDisplayManager {
     private func openPreview(for configID: String, title: String, width: Int, height: Int) {
         guard previewsByID[configID] == nil,
               let did = cgDisplayID(for: configID) else { return }
-        let wc = VirtualPreviewWindowController(displayID: did, pixelWidth: width, pixelHeight: height, title: title)
+        let wc = VirtualPreviewWindowController(displayID: did, pixelWidth: width, pixelHeight: height, title: title) { [weak self] in
+            guard let self else { return }
+            // 1) Para NDI desta tela (e remove da seleção)
+            MultiDisplayNDIManager.shared.stopForDisplayID(did)
+            // 2) Marca config como desabilitada e salva
+            if let idx = self.configs.firstIndex(where: { $0.id == configID }) {
+                self.configs[idx].enabled = false
+                self.save()
+            }
+            // 3) Remove runtime display e referência do preview
+            self.destroy(configID: configID)
+            // 4) Opcional: pedir refresh do menu
+            NotificationCenter.default.post(name: Notification.Name("StatusBarRefreshRequest"), object: nil)
+        }
         previewsByID[configID] = wc
         wc.showWindow(nil)
         wc.start()

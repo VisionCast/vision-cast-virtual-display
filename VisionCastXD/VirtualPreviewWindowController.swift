@@ -1,7 +1,7 @@
 import Cocoa
 import CoreVideo
 
-final class VirtualPreviewWindowController: NSWindowController {
+final class VirtualPreviewWindowController: NSWindowController, NSWindowDelegate {
     private let displayID: CGDirectDisplayID
     private var pixelWidth: Int
     private var pixelHeight: Int
@@ -9,10 +9,14 @@ final class VirtualPreviewWindowController: NSWindowController {
     private var stream: CGDisplayStream?
     private let contentView = NSView(frame: .zero)
 
-    init(displayID: CGDirectDisplayID, pixelWidth: Int, pixelHeight: Int, title: String) {
+    // Chamado quando a janela for fechada
+    private let onClose: () -> Void
+
+    init(displayID: CGDirectDisplayID, pixelWidth: Int, pixelHeight: Int, title: String, onClose: @escaping () -> Void = {}) {
         self.displayID = displayID
         self.pixelWidth = pixelWidth
         self.pixelHeight = pixelHeight
+        self.onClose = onClose
 
         let scale = NSScreen.main?.backingScaleFactor ?? 2.0
         let sizePoints = NSSize(width: CGFloat(pixelWidth) / scale, height: CGFloat(pixelHeight) / scale)
@@ -24,10 +28,11 @@ final class VirtualPreviewWindowController: NSWindowController {
             defer: false
         )
         win.title = title
-        win.contentAspectRatio = sizePoints // mantém proporção
+        win.contentAspectRatio = sizePoints
         win.center()
 
         super.init(window: win)
+        window?.delegate = self
         window?.contentView = contentView
         contentView.wantsLayer = true
         if let layer = contentView.layer {
@@ -81,6 +86,12 @@ final class VirtualPreviewWindowController: NSWindowController {
 
     func setTitle(_ title: String) {
         window?.title = title
+    }
+
+    // Ao fechar a janela do preview, pare stream e notifique o gerenciador (para matar NDI)
+    func windowWillClose(_: Notification) {
+        stop()
+        onClose()
     }
 
     deinit { stop() }

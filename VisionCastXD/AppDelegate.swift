@@ -22,13 +22,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             print("Falha ao inicializar NDI")
         }
 
-        // Carrega configs; NÃO cria nenhum virtual automaticamente
         VirtualDisplayManager.shared.load()
-        VirtualDisplayManager.shared.createAllEnabled() // Se não houver, não abre preview algum
+        VirtualDisplayManager.shared.createAllEnabled()
 
         setupStatusBar()
 
-        // Seleção NDI inicial = o que já havia + virtuais habilitados
+        // Observa pedidos de refresh do Status Bar (ex.: ao fechar preview)
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(handleStatusBarRefresh),
+                                               name: Notification.Name("StatusBarRefreshRequest"),
+                                               object: nil)
+
         var selected = currentSelectedDisplayUUIDs()
         selected.formUnion(VirtualDisplayManager.shared.currentVirtualUUIDs())
         UserDefaults.standard.set(Array(selected), forKey: kSelectedDisplayUUIDs)
@@ -37,7 +41,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             MultiDisplayNDIManager.shared.start()
         }
 
-        // Menu simples (somente “Sair”, opcional)
         let mainMenu = NSMenu()
         let mainMenuItem = NSMenuItem()
         let subMenu = NSMenu(title: "MainMenu")
@@ -48,6 +51,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.mainMenu = mainMenu
 
         store.dispatch(AppDelegateAction.didFinishLaunching)
+    }
+
+    @objc private func handleStatusBarRefresh() {
+        statusBar?.refresh()
+    }
+
+    private func currentSelectedDisplayUUIDs() -> Set<String> {
+        let defaults = UserDefaults.standard
+        if let arr = defaults.array(forKey: kSelectedDisplayUUIDs) as? [String] {
+            return Set(arr)
+        }
+        return []
     }
 
     private func setupStatusBar() {
@@ -220,15 +235,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         alert.addButton(withTitle: "OK")
         alert.addButton(withTitle: "Cancelar")
 
+        let numberFormatter: NumberFormatter = {
+            let nf = NumberFormatter()
+            nf.numberStyle = .none
+            nf.minimum = 1
+            nf.maximum = 100_000
+            nf.allowsFloats = false
+            return nf
+        }()
+
         let widthField = NSTextField(string: "\(defaultW)")
         widthField.alignment = .right
         widthField.frame = NSRect(x: 0, y: 28, width: 120, height: 24)
+        widthField.formatter = numberFormatter
+
         let xLabel = NSTextField(labelWithString: "×")
         xLabel.frame = NSRect(x: 124, y: 28, width: 14, height: 24)
         xLabel.alignment = .center
+
         let heightField = NSTextField(string: "\(defaultH)")
         heightField.alignment = .right
         heightField.frame = NSRect(x: 140, y: 28, width: 120, height: 24)
+        heightField.formatter = numberFormatter
 
         let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 60))
         accessory.addSubview(widthField)
@@ -239,20 +267,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard alert.runModal() == .alertFirstButtonReturn else {
             return nil
         }
-        let w = Int(widthField.stringValue) ?? 0
-        let h = Int(heightField.stringValue) ?? 0
+
+        // Como usamos formatter, os valores já são numéricos válidos
+        let w = (widthField.stringValue as NSString).integerValue
+        let h = (heightField.stringValue as NSString).integerValue
         guard w > 0, h > 0 else {
             return nil
         }
         return (w, h)
-    }
-
-    private func currentSelectedDisplayUUIDs() -> Set<String> {
-        let defaults = UserDefaults.standard
-        if let arr = defaults.array(forKey: kSelectedDisplayUUIDs) as? [String] {
-            return Set(arr)
-        }
-        return []
     }
 
     // Compatibilidade (caso algum fluxo legado chame)
@@ -267,6 +289,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_: Notification) {
+        NotificationCenter.default.removeObserver(self, name: Notification.Name("StatusBarRefreshRequest"), object: nil)
         MultiDisplayNDIManager.shared.stopAll()
         if ndiInitialized {
             NDIlib_destroy()

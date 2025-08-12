@@ -29,6 +29,18 @@ final class MultiDisplayNDIManager {
         applySelection()
     }
 
+    func stopForDisplayID(_ id: CGDirectDisplayID) {
+        stopPipeline(for: id)
+        if let cf = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue() {
+            let uuid = CFUUIDCreateString(nil, cf) as String
+            if selectedDisplayUUIDs.contains(uuid) {
+                selectedDisplayUUIDs.remove(uuid)
+                var arr = Array(selectedDisplayUUIDs)
+                UserDefaults.standard.set(arr, forKey: "selectedDisplayUUIDs")
+            }
+        }
+    }
+
     func setSelectedDisplays(_ uuids: Set<String>) {
         let old = selectedDisplayUUIDs
         selectedDisplayUUIDs = uuids
@@ -107,11 +119,7 @@ final class MultiDisplayNDIManager {
     }
 
     private func displayFriendlyName(for displayID: CGDirectDisplayID) -> String {
-        // Se for virtual gerenciado, usa o nome da config
-        if let name = VirtualDisplayManager.shared.nameForDisplayID(displayID) {
-            return name
-        }
-        // Caso contrário tenta pegar o nome do NSScreen
+        if let name = VirtualDisplayManager.shared.nameForDisplayID(displayID) { return name }
         for screen in NSScreen.screens {
             if let num = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber,
                CGDirectDisplayID(num.uint32Value) == displayID
